@@ -263,16 +263,22 @@ app.get('/api/recordings', async (req, res) => {
       if (obj.LastModified > recordingsMap[sid].timestamp) recordingsMap[sid].timestamp = obj.LastModified;
     }
 
-    // Generate signed URLs for all video files in the grouped recordings
+    // Generate signed URLs for all video files in the grouped recordings (Parallelized for Vercel performance)
+    const signingPromises = [];
     for (const sid in recordingsMap) {
       const rec = recordingsMap[sid];
       for (const file of rec.files) {
         if (file.filename.endsWith('.mp4') || file.filename.endsWith('.webm')) {
           const getObjCmd = new GetObjectCommand({ Bucket: AGORA_AWS_BUCKET, Key: file.key });
-          file.url = await getSignedUrl(s3Client, getObjCmd, { expiresIn: 3600 });
+          signingPromises.push(
+            getSignedUrl(s3Client, getObjCmd, { expiresIn: 3600 })
+              .then(url => { file.url = url; })
+              .catch(err => console.error(`Failed to sign URL for ${file.key}:`, err))
+          );
         }
       }
     }
+    await Promise.all(signingPromises);
 
     const result = Object.values(recordingsMap).sort((a, b) => b.timestamp - a.timestamp);
     res.json(result);
