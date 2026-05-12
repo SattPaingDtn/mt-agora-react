@@ -1,0 +1,494 @@
+/* ============================================================
+   LuxeLanding — Premium Landing Page
+   Black & Gold immersive entry experience
+   ============================================================ */
+
+/* ---------- Container ---------- */
+.landing {
+  position: relative;
+  width: 100vw;
+  height: 100vh;
+  background: #0a0a0a;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  font-family: 'Outfit', 'Inter', -apple-system, sans-serif;
+}
+
+/* ---------- Animated Background ---------- */
+
+/* Radial gold ambient glow */
+.bgGlow {
+  position: absolute;
+  width: 600px;
+  height: 600px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(212,175,55,0.08) 0%, transparent 70%);
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+  animation: breathe 6s ease-in-out infinite;
+}
+
+@keyframes breathe {
+  0%, 100% { transform: translate(-50%, -50%) scale(1); opacity: 1; }
+  50% { transform: translate(-50%, -50%) scale(1.25); opacity: 0.6; }
+}
+
+/* Floating particle orbs */
+.particleOrb {
+  position: absolute;
+  border-radius: 50%;
+  pointer-events: none;
+  opacity: 0;
+  animation: float 12s ease-in-out infinite;
+}
+
+.particleOrb:nth-child(1) {
+  width: 4px; height: 4px;
+  background: rgba(212,175,55,0.5);
+  top: 20%; left: 15%;
+  animation-delay: 0s;
+  animation-duration: 10s;
+}
+.particleOrb:nth-child(2) {
+  width: 3px; height: 3px;
+  background: rgba(212,175,55,0.35);
+  top: 70%; left: 80%;
+  animation-delay: 2s;
+  animation-duration: 14s;
+}
+.particleOrb:nth-child(3) {
+  width: 5px; height: 5px;
+  background: rgba(212,175,55,0.4);
+  top: 35%; left: 75%;
+  animation-delay: 4s;
+  animation-duration: 11s;
+}
+.particleOrb:nth-child(4) {
+  width: 3px; height: 3px;
+  background: rgba(245,215,110,0.3);
+  top: 80%; left: 25%;
+  animation-delay: 1s;
+  animation-duration: 13s;
+}
+.particleOrb:nth-child(5) {
+  width: 6px; height: 6px;
+  background: rgba(212,175,55,0.25);
+  top: 15%; left: 60%;
+  animation-delay: 3s;
+  animation-duration: 15s;
+}
+.particleOrb:nth-child(6) {
+  width: 2px; height: 2px;
+  background: rgba(212,175,55,0.6);
+  top: 55%; left: 10%;
+  animation-delay: 5s;
+  animation-duration: 9s;
+}
+
+@keyframes float {
+  0% { opacity: 0; transform: translateY(0) translateX(0); }
+  20% { opacity: 1; }
+  80% { opacity: 1; }
+  100% { opacity: 0; transform: translateY(-120px) translateX(30px); }
+}
+
+/* Subtle grid lines */
+.gridOverlay {
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(rgba(212,175,55,0.02) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(212,175,55,0.02) 1px, transparent 1px);
+  background-size: 80px 80px;
+  pointer-events: none;
+}
+
+/* Top gold accent line */
+.topAccent {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 200px;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, #D4AF37, transparent);
+  opacity: 0.6;
+}
+
+/* ---------- Nav ---------- */
+.nav {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 24px 48px;
+  z-index: 10;
+}
+
+.navBrand {
+  font-family: 'Outfit', sans-serif;
+  font-size: 20px;
+  font-weight: 700;
+  letter-spacing: 5px;
+  background: linear-gradient(135deg, #D4AF37 0%, #F5D76E 50%, #D4AF37 100%);
+  background-size: 200% auto;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  animation: shimmer 4s linear infinite;
+}
+
+@keyframes shimmer {
+  0% { background-position: 0% center; }
+  100% { background-position: 200% center; }
+}
+
+.navStatus {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: #A0A0A0;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  font-weight: 500;
+}
+
+.statusDot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #4caf50;
+  box-shadow: 0 0 8px rgba(76,175,80,0.6);
+  animation: pulse 2s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.5; transform: scale(0.8); }
+}
+
+/* ---------- Hero Content ---------- */
+.heroContent {
+  position: relative;
+  z-index: 5;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding: 0 24px;
+}
+
+/* Gold diamond icon */
+.heroIcon {
+  width: 56px;
+  height: 56px;
+  margin-bottom: 28px;
+  position: relative;
+}
+
+.heroIconDiamond {
+  width: 56px;
+  height: 56px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1.5px solid rgba(212,175,55,0.3);
+  border-radius: 16px;
+  transform: rotate(45deg);
+  background: rgba(212,175,55,0.04);
+  animation: iconGlow 3s ease-in-out infinite;
+}
+
+.heroIconInner {
+  transform: rotate(-45deg);
+  font-size: 22px;
+}
+
+@keyframes iconGlow {
+  0%, 100% { box-shadow: 0 0 0 rgba(212,175,55,0); border-color: rgba(212,175,55,0.3); }
+  50% { box-shadow: 0 0 30px rgba(212,175,55,0.15); border-color: rgba(212,175,55,0.5); }
+}
+
+/* Tagline */
+.heroTagline {
+  font-size: 12px;
+  letter-spacing: 4px;
+  text-transform: uppercase;
+  color: #D4AF37;
+  font-weight: 600;
+  margin-bottom: 16px;
+  opacity: 0.9;
+}
+
+/* Title */
+.heroTitle {
+  font-family: 'Outfit', sans-serif;
+  font-size: 52px;
+  font-weight: 800;
+  line-height: 1.15;
+  letter-spacing: -1px;
+  color: #FFFFFF;
+  margin-bottom: 18px;
+  max-width: 580px;
+}
+
+.heroTitleAccent {
+  background: linear-gradient(135deg, #D4AF37, #F5D76E);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* Description */
+.heroDesc {
+  font-size: 16px;
+  line-height: 1.7;
+  color: #A0A0A0;
+  max-width: 440px;
+  margin-bottom: 40px;
+  font-weight: 400;
+}
+
+/* ---------- CTA Button ---------- */
+.ctaWrapper {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 18px;
+}
+
+.ctaBtn {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 16px 48px;
+  font-family: 'Outfit', sans-serif;
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: #0a0a0a;
+  background: linear-gradient(135deg, #D4AF37 0%, #F5D76E 50%, #D4AF37 100%);
+  background-size: 200% auto;
+  border: none;
+  border-radius: 60px;
+  cursor: pointer;
+  transition: all 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+  overflow: hidden;
+  z-index: 1;
+}
+
+.ctaBtn::before {
+  content: '';
+  position: absolute;
+  inset: -2px;
+  border-radius: 62px;
+  background: linear-gradient(135deg, #D4AF37, #F5D76E, #D4AF37);
+  background-size: 200% auto;
+  z-index: -1;
+  opacity: 0;
+  transition: opacity 0.35s ease;
+  animation: shimmer 3s linear infinite;
+}
+
+.ctaBtn:hover {
+  transform: translateY(-2px);
+  box-shadow:
+    0 8px 30px rgba(212,175,55,0.3),
+    0 0 60px rgba(212,175,55,0.1);
+  background-position: right center;
+}
+
+.ctaBtn:hover::before {
+  opacity: 1;
+}
+
+.ctaBtn:active {
+  transform: translateY(0) scale(0.98);
+}
+
+.ctaBtnIcon {
+  font-size: 18px;
+  transition: transform 0.3s ease;
+}
+
+.ctaBtn:hover .ctaBtnIcon {
+  transform: scale(1.15);
+}
+
+/* Subtle secondary hint */
+.ctaHint {
+  font-size: 11px;
+  color: rgba(160,160,160,0.5);
+  letter-spacing: 1px;
+}
+
+/* ---------- Channel Input Pill ---------- */
+.channelPill {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 32px;
+  padding: 10px 20px;
+  background: rgba(28,28,28,0.6);
+  border: 1px solid rgba(212,175,55,0.12);
+  border-radius: 40px;
+  backdrop-filter: blur(8px);
+}
+
+.channelPillLabel {
+  font-size: 11px;
+  color: #A0A0A0;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.channelPillInput {
+  background: none;
+  border: none;
+  outline: none;
+  color: #FFFFFF;
+  font-family: 'Inter', sans-serif;
+  font-size: 14px;
+  font-weight: 500;
+  letter-spacing: 0.5px;
+  width: 140px;
+}
+
+.channelPillInput::placeholder {
+  color: rgba(160,160,160,0.4);
+}
+
+.channelPillDivider {
+  width: 1px;
+  height: 16px;
+  background: rgba(212,175,55,0.2);
+}
+
+/* ---------- Feature Badges ---------- */
+.features {
+  position: absolute;
+  bottom: 64px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 32px;
+  z-index: 5;
+}
+
+.featureBadge {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: rgba(160,160,160,0.6);
+  letter-spacing: 0.5px;
+  font-weight: 400;
+}
+
+.featureBadgeIcon {
+  font-size: 16px;
+  opacity: 0.7;
+}
+
+.featureSep {
+  width: 3px;
+  height: 3px;
+  border-radius: 50%;
+  background: rgba(212,175,55,0.25);
+}
+
+/* ---------- Bottom Gold Line ---------- */
+.bottomAccent {
+  position: absolute;
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 300px;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(212,175,55,0.2), transparent);
+}
+
+/* ---------- Corner Ornaments ---------- */
+.cornerTL, .cornerBR {
+  position: absolute;
+  width: 60px;
+  height: 60px;
+  pointer-events: none;
+  opacity: 0.15;
+}
+.cornerTL {
+  top: 20px;
+  left: 20px;
+  border-top: 1px solid #D4AF37;
+  border-left: 1px solid #D4AF37;
+}
+.cornerBR {
+  bottom: 20px;
+  right: 20px;
+  border-bottom: 1px solid #D4AF37;
+  border-right: 1px solid #D4AF37;
+}
+
+/* ---------- Responsive ---------- */
+@media (max-width: 768px) {
+  .nav {
+    padding: 18px 24px;
+  }
+  .navBrand {
+    font-size: 16px;
+    letter-spacing: 3px;
+  }
+  .heroTitle {
+    font-size: 34px;
+  }
+  .heroDesc {
+    font-size: 14px;
+    max-width: 320px;
+  }
+  .ctaBtn {
+    padding: 14px 36px;
+    font-size: 13px;
+  }
+  .features {
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 16px;
+    bottom: 40px;
+    padding: 0 20px;
+  }
+  .channelPill {
+    flex-direction: column;
+    gap: 6px;
+    padding: 12px 20px;
+    border-radius: 16px;
+  }
+  .channelPillDivider {
+    width: 40px;
+    height: 1px;
+  }
+}
+
+@media (max-width: 480px) {
+  .heroTitle {
+    font-size: 28px;
+  }
+  .features {
+    display: none;
+  }
+}

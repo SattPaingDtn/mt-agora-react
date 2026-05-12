@@ -1,0 +1,681 @@
+/* ============================================================
+   PremiumMeetingRoom — LUXE MEET Design System
+   Premium Black & Gold theme for exclusive meeting application
+   ============================================================ */
+
+/* ---------- Layout Shell ---------- */
+.container {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+  background-color: #0a0a0a;
+  color: #FFFFFF;
+  font-family: 'Inter', 'SF Pro Display', -apple-system, BlinkMacSystemFont, sans-serif;
+  overflow: hidden;
+  z-index: 100;
+}
+
+/* ---------- Header ---------- */
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 28px;
+  background: linear-gradient(
+    180deg,
+    rgba(20, 20, 20, 0.98) 0%,
+    rgba(10, 10, 10, 0.92) 100%
+  );
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border-bottom: 1px solid rgba(212, 175, 55, 0.1);
+  z-index: 10;
+  flex-shrink: 0;
+}
+
+.brandName {
+  font-family: 'Outfit', 'Inter', sans-serif;
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: 4px;
+  background: linear-gradient(135deg, #D4AF37 0%, #F5D76E 50%, #D4AF37 100%);
+  background-size: 200% auto;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  animation: shimmer 4s linear infinite;
+}
+
+@keyframes shimmer {
+  0% { background-position: 0% center; }
+  100% { background-position: 200% center; }
+}
+
+.channelInfo {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.channelDot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background-color: #4caf50;
+  box-shadow: 0 0 8px rgba(76, 175, 80, 0.6);
+  animation: pulse 2s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.6; transform: scale(0.85); }
+}
+
+.channelName {
+  font-size: 13px;
+  color: #A0A0A0;
+  font-weight: 500;
+  letter-spacing: 1px;
+}
+
+/* LIVE Badge in Header */
+.liveBadge {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  background: rgba(229, 57, 53, 0.15);
+  border: 1px solid rgba(229, 57, 53, 0.3);
+  border-radius: 6px;
+  font-size: 10px;
+  font-weight: 800;
+  color: #FF5252;
+  letter-spacing: 1.5px;
+  margin-left: 12px;
+  animation: fadeIn 0.4s ease;
+}
+
+.liveDot {
+  width: 6px;
+  height: 6px;
+  background-color: #FF5252;
+  border-radius: 50%;
+  box-shadow: 0 0 6px rgba(255, 82, 82, 0.8);
+  animation: pulseLive 1s infinite;
+}
+
+@keyframes pulseLive {
+  0% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(1.3); opacity: 0.6; }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.headerRight {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.timerBadge {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: #A0A0A0;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.5px;
+}
+
+.timerIcon {
+  font-size: 13px;
+  opacity: 0.7;
+}
+
+.participantCount {
+  font-size: 12px;
+  color: #A0A0A0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 14px;
+  border: 1px solid rgba(212, 175, 55, 0.12);
+  border-radius: 20px;
+  background: rgba(212, 175, 55, 0.03);
+  font-weight: 500;
+}
+
+.participantCountIcon {
+  font-size: 14px;
+}
+
+/* ---------- Main Workspace (Video Grid) ---------- */
+.workspace {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  overflow: hidden;
+  min-height: 0; /* critical for flex child shrinking */
+}
+
+.videoGrid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  justify-content: center;
+  align-items: center;
+  width: 100%;
+  height: 100%;
+  max-width: 1400px;
+}
+
+/* ---------- Video Tile ---------- */
+.videoTile {
+  position: relative;
+  background-color: #1c1c1c;
+  border-radius: 16px;
+  overflow: hidden;
+  box-shadow: 0 10px 30px rgba(212, 175, 55, 0.1);
+  border: 1px solid rgba(212, 175, 55, 0.06);
+  transition: box-shadow 0.3s ease, transform 0.3s ease;
+}
+
+.videoTile:hover {
+  box-shadow: 0 14px 40px rgba(212, 175, 55, 0.16);
+  transform: translateY(-1px);
+}
+
+/* Solo view — fill workspace */
+.videoTileSolo {
+  width: 100%;
+  max-width: 960px;
+  height: 100%;
+  max-height: 100%;
+}
+
+/* Duo view */
+.videoTileDuo {
+  width: calc(50% - 8px);
+  height: 100%;
+  max-height: 100%;
+}
+
+/* Multi view (3+) */
+.videoTileMulti {
+  width: calc(50% - 8px);
+  height: calc(50% - 8px);
+}
+
+.videoTile video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* Name Tag — Glassmorphism */
+.nameTag {
+  position: absolute;
+  bottom: 14px;
+  left: 14px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  background: rgba(10, 10, 10, 0.55);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: 1px solid rgba(212, 175, 55, 0.2);
+  border-radius: 20px;
+  z-index: 5;
+  transition: background 0.25s ease;
+}
+
+.videoTile:hover .nameTag {
+  background: rgba(10, 10, 10, 0.7);
+}
+
+.nameTagText {
+  font-size: 12px;
+  font-weight: 600;
+  color: #FFFFFF;
+  letter-spacing: 0.5px;
+}
+
+.nameTagYou {
+  font-size: 10px;
+  color: #D4AF37;
+  font-weight: 500;
+}
+
+/* Mic indicator on name tag */
+.nameTagMic {
+  font-size: 11px;
+  margin-left: 2px;
+  opacity: 0.8;
+}
+
+/* Camera-off placeholder */
+.cameraOff {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(145deg, #111111, #1a1a1a);
+  z-index: 2;
+}
+
+.cameraOffAvatar {
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #D4AF37, #b8962e);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 32px;
+  font-weight: 700;
+  color: #0a0a0a;
+  margin-bottom: 12px;
+  box-shadow: 0 8px 24px rgba(212, 175, 55, 0.15);
+}
+
+.cameraOffLabel {
+  font-size: 13px;
+  color: #A0A0A0;
+  font-weight: 400;
+}
+
+/* ---------- Control Footer ---------- */
+.footer {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 14px 28px;
+  background: linear-gradient(
+    0deg,
+    rgba(16, 16, 16, 0.99) 0%,
+    rgba(10, 10, 10, 0.95) 100%
+  );
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border-top: 1px solid rgba(212, 175, 55, 0.08);
+  gap: 10px;
+  flex-shrink: 0;
+  z-index: 10;
+}
+
+/* ---------- Control Button ---------- */
+.controlBtn {
+  position: relative;
+  width: 50px;
+  height: 50px;
+  border-radius: 50%;
+  border: 1.5px solid rgba(212, 175, 55, 0.2);
+  background: rgba(28, 28, 28, 0.6);
+  color: #FFFFFF;
+  font-size: 19px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition:
+    border-color 0.25s ease,
+    box-shadow 0.25s ease,
+    background-color 0.25s ease,
+    transform 0.2s ease;
+}
+
+.controlBtn:hover {
+  border-color: #D4AF37;
+  box-shadow: 0 0 20px rgba(212, 175, 55, 0.2);
+  background: rgba(212, 175, 55, 0.06);
+  transform: scale(1.08);
+}
+
+.controlBtn:active {
+  transform: scale(0.94);
+}
+
+/* Active / toggled-on state */
+.controlBtnActive {
+  border-color: rgba(212, 175, 55, 0.6);
+  background: rgba(212, 175, 55, 0.12);
+  box-shadow: 0 0 12px rgba(212, 175, 55, 0.1);
+}
+
+/* Muted / toggled-off state */
+.controlBtnMuted {
+  border-color: rgba(120, 120, 120, 0.25);
+  background: rgba(50, 50, 50, 0.5);
+  color: #888888;
+}
+
+.controlBtnMuted::after {
+  content: '';
+  position: absolute;
+  width: 28px;
+  height: 2px;
+  background: #E53935;
+  border-radius: 1px;
+  transform: rotate(-45deg);
+  opacity: 0.7;
+}
+
+.controlBtnMuted:hover {
+  border-color: #888888;
+  box-shadow: 0 0 14px rgba(160, 160, 160, 0.12);
+  background: rgba(70, 70, 70, 0.4);
+}
+
+/* End Call Button */
+.endCallBtn {
+  position: relative;
+  width: 64px;
+  height: 50px;
+  border-radius: 26px;
+  border: none;
+  background: linear-gradient(135deg, #E53935, #C62828);
+  color: #FFFFFF;
+  font-size: 20px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-left: 10px;
+  transition:
+    box-shadow 0.25s ease,
+    transform 0.2s ease,
+    background 0.25s ease;
+}
+
+.endCallBtn:hover {
+  box-shadow: 0 0 28px rgba(229, 57, 53, 0.45);
+  transform: scale(1.08);
+  background: linear-gradient(135deg, #F44336, #D32F2F);
+}
+
+.endCallBtn:active {
+  transform: scale(0.94);
+}
+
+/* ---------- Control Button Tooltip ---------- */
+.controlBtnTooltip {
+  position: absolute;
+  bottom: calc(100% + 10px);
+  left: 50%;
+  transform: translateX(-50%) translateY(4px);
+  padding: 5px 12px;
+  background: rgba(10, 10, 10, 0.92);
+  border: 1px solid rgba(212, 175, 55, 0.12);
+  border-radius: 8px;
+  font-size: 11px;
+  color: #A0A0A0;
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.2s ease, transform 0.2s ease;
+}
+
+.controlBtn:hover .controlBtnTooltip,
+.endCallBtn:hover .controlBtnTooltip {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}
+
+/* ---------- Divider in controls ---------- */
+.controlDivider {
+  width: 1px;
+  height: 28px;
+  background: rgba(212, 175, 55, 0.1);
+  margin: 0 4px;
+}
+
+/* ---------- Responsive ---------- */
+@media (max-width: 768px) {
+  .header {
+    padding: 10px 16px;
+  }
+  .brandName {
+    font-size: 15px;
+    letter-spacing: 3px;
+  }
+  .workspace {
+    padding: 10px;
+  }
+  .videoTileSolo,
+  .videoTileDuo,
+  .videoTileMulti {
+    width: 100%;
+    max-width: 100%;
+    height: auto;
+    aspect-ratio: 16 / 9;
+  }
+  .videoGrid {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .footer {
+    padding: 10px 16px;
+    gap: 8px;
+  }
+  .controlBtn {
+    width: 44px;
+    height: 44px;
+    font-size: 16px;
+  }
+  .endCallBtn {
+    width: 56px;
+    height: 44px;
+    font-size: 17px;
+  }
+  .timerBadge {
+    display: none;
+  }
+}
+
+/* ---------- Modal Styles (Glassmorphism) ---------- */
+.modalOverlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.8);
+  backdrop-filter: blur(8px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  animation: modalOverlayIn 0.3s ease;
+}
+
+@keyframes modalOverlayIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.modalContent {
+  width: 100%;
+  max-width: 480px;
+  background: linear-gradient(145deg, rgba(28, 28, 28, 0.95), rgba(15, 15, 15, 0.98));
+  border: 1px solid rgba(212, 175, 55, 0.15);
+  border-radius: 24px;
+  padding: 32px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5), 0 0 40px rgba(212, 175, 55, 0.05);
+  animation: modalContentIn 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes modalContentIn {
+  from { opacity: 0; transform: scale(0.95) translateY(20px); }
+  to { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+.modalHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 24px;
+}
+
+.modalTitle {
+  font-size: 24px;
+  font-weight: 700;
+  background: linear-gradient(135deg, #D4AF37, #F5D76E);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  margin: 0;
+}
+
+.modalCloseBtn {
+  background: none;
+  border: none;
+  color: #888;
+  font-size: 28px;
+  cursor: pointer;
+  line-height: 1;
+  transition: color 0.2s;
+}
+
+.modalCloseBtn:hover {
+  color: #fff;
+}
+
+.modalForm {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.formGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.formLabel {
+  font-size: 13px;
+  font-weight: 600;
+  color: #A0A0A0;
+  letter-spacing: 0.5px;
+}
+
+.formInput {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(212, 175, 55, 0.1);
+  border-radius: 12px;
+  padding: 12px 16px;
+  color: #fff;
+  font-size: 14px;
+  transition: border-color 0.2s, background 0.2s;
+}
+
+.formInput:focus {
+  outline: none;
+  border-color: #D4AF37;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.formHelp {
+  font-size: 11px;
+  color: #666;
+}
+
+.qualityGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.qualityBtn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 14px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 14px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.qualityBtn:hover {
+  background: rgba(212, 175, 55, 0.05);
+  border-color: rgba(212, 175, 55, 0.2);
+}
+
+.qualityBtnActive {
+  background: rgba(212, 175, 55, 0.12);
+  border-color: #D4AF37;
+  box-shadow: 0 0 15px rgba(212, 175, 55, 0.1);
+}
+
+.qualityLabel {
+  font-size: 14px;
+  font-weight: 700;
+  color: #fff;
+}
+
+.qualityDetail {
+  font-size: 10px;
+  color: #888;
+}
+
+.modalFooter {
+  display: flex;
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.cancelBtn {
+  flex: 1;
+  padding: 14px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 14px;
+  color: #fff;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.cancelBtn:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.startStreamBtn {
+  flex: 2;
+  padding: 14px;
+  background: linear-gradient(135deg, #D4AF37, #b8962e);
+  border: none;
+  border-radius: 14px;
+  color: #0a0a0a;
+  font-weight: 700;
+  cursor: pointer;
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.startStreamBtn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px rgba(212, 175, 55, 0.3);
+}
+
+.startStreamBtn:active {
+  transform: translateY(0);
+}
+
+.startStreamBtn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
