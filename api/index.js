@@ -189,8 +189,9 @@ app.post('/api/rtmp/start', async (req, res) => {
       converter: {
         name: `luxe_stream_${channelName}`,
         rtmpUrl: rtmpUrl,
+        rtcChannel: channelName,
+        cname: channelName,
         transcodeOptions: {
-          rtcChannel: channelName,
           audioOptions: { codecProfile: "LC-AAC", sampleRate: 48000, bitrate: 128, audioChannels: 2, rtcStreamUids: allStreamUids },
           videoOptions: { canvas: { width: parseInt(width || 1280, 10), height: parseInt(height || 720, 10), color: 0 }, layout: layout, bitrate: parseInt(bitrate || 2500, 10), frameRate: parseInt(fps || 30, 10) }
         },
