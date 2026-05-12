@@ -12,6 +12,8 @@
     "start": "concurrently \"npm run server\" \"npm run dev\""
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.1045.0",
+    "@aws-sdk/s3-request-presigner": "^3.1045.0",
     "agora-extension-virtual-background": "^2.1.0",
     "agora-rtc-react": "^2.5.1",
     "agora-rtc-sdk-ng": "^4.23.0",

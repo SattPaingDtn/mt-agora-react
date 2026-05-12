@@ -7,12 +7,14 @@ import { useState } from 'react';
 import AgoraRTC, { AgoraRTCProvider, useRTCClient } from 'agora-rtc-react';
 import LuxeLanding from './LuxeLanding';
 import PremiumMeetingRoom from './PremiumMeetingRoom';
+import RecordingGallery from './components/RecordingGallery';
 
 function App() {
   const client = useRTCClient(
     AgoraRTC.createClient({ codec: 'h264', mode: 'rtc' })
   );
   const [inCall, setInCall] = useState(false);
+  const [showGallery, setShowGallery] = useState(false);
   const [channelName, setChannelName] = useState('');
   const [displayName, setDisplayName] = useState('');
 
@@ -28,8 +30,12 @@ function App() {
     setInCall(false);
   };
 
+  if (showGallery) {
+    return <RecordingGallery onBack={() => setShowGallery(false)} />;
+  }
+
   if (!inCall) {
-    return <LuxeLanding onJoin={handleJoin} />;
+    return <LuxeLanding onJoin={handleJoin} onShowGallery={() => setShowGallery(true)} />;
   }
 
   return (

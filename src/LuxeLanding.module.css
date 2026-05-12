@@ -162,6 +162,36 @@
   font-weight: 500;
 }
 
+.navRight {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+}
+
+.navRecordingsBtn {
+  background: rgba(212, 175, 55, 0.08);
+  border: 1px solid rgba(212, 175, 55, 0.2);
+  color: #D4AF37;
+  padding: 8px 16px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  display: flex;
+  align-items: center;
+  font-family: 'Outfit', sans-serif;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.navRecordingsBtn:hover {
+  background: rgba(212, 175, 55, 0.15);
+  border-color: #D4AF37;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 15px rgba(212, 175, 55, 0.1);
+}
+
 .statusDot {
   width: 6px;
   height: 6px;

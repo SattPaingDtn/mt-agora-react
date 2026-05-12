@@ -13,7 +13,7 @@
 import { useState, useCallback } from 'react';
 import styles from './LuxeLanding.module.css';
 
-export default function LuxeLanding({ onJoin }) {
+export default function LuxeLanding({ onJoin, onShowGallery }) {
   const [channel, setChannel] = useState('');
   const [displayName, setDisplayName] = useState('');
 
@@ -51,9 +51,15 @@ export default function LuxeLanding({ onJoin }) {
       {/* ── Navigation Bar ── */}
       <nav className={styles.nav}>
         <span className={styles.navBrand}>LUXE MEET</span>
-        <div className={styles.navStatus}>
-          <span className={styles.statusDot} />
-          <span>System Online</span>
+        <div className={styles.navRight}>
+          <button className={styles.navRecordingsBtn} onClick={onShowGallery}>
+            <span style={{marginRight: '8px'}}>🎥</span>
+            View Recordings
+          </button>
+          <div className={styles.navStatus}>
+            <span className={styles.statusDot} />
+            <span>System Online</span>
+          </div>
         </div>
       </nav>
 

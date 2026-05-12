@@ -4,6 +4,8 @@ import axios from 'axios';
 import dotenv from 'dotenv';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { S3Client, ListObjectsV2Command, DeleteObjectsCommand, GetObjectCommand } from "@aws-sdk/client-s3";
+import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -116,7 +118,7 @@ app.post('/api/recording/start', async (req, res) => {
     bucket: AGORA_AWS_BUCKET,
     accessKey: AGORA_AWS_ACCESS_KEY,
     secretKey: AGORA_AWS_SECRET_KEY,
-    fileNamePrefix: ["agora", "recording", channelName]
+    fileNamePrefix: ["agora", "recording", channelName, mode]
   };
 
   let recordingConfig = { maxIdleTime: 30, streamTypes: 2, channelType: 0 };
@@ -133,7 +135,7 @@ app.post('/api/recording/start', async (req, res) => {
       {
         cname: channelName,
         uid: uid.toString(),
-        clientRequest: { token: token || "", recordingConfig, recordingFileConfig: { avFileType: mode === 'individual' ? ["hls"] : ["hls", "mp4"] }, storageConfig }
+        clientRequest: { token: token || "", recordingConfig, recordingFileConfig: { avFileType: ["hls", "mp4"] }, storageConfig }
       },
       { headers: { 'Authorization': getAuthHeader(), 'Content-Type': 'application/json' } }
     );
@@ -154,6 +156,144 @@ app.post('/api/recording/stop', async (req, res) => {
     res.json(response.data);
   } catch (error) {
     res.status(500).json(error.response?.data || { error: 'Failed to stop recording' });
+  }
+});
+
+// --- S3 Recording Management ---
+const agoraRegionMap = {
+  "0": "us-east-1",
+  "1": "us-east-2",
+  "2": "us-west-1",
+  "3": "ap-northeast-1", // Fixed for user's specific bucket location
+  "4": "eu-west-1",
+  "5": "eu-central-1",
+  "6": "ap-southeast-1",
+  "7": "ap-southeast-2",
+  "8": "ap-northeast-1",
+  "9": "sa-east-1",
+  "10": "ca-central-1",
+  "11": "eu-west-2",
+  "12": "ap-northeast-2",
+  "13": "ap-south-1",
+  "14": "sa-east-1",
+  "15": "us-east-1",
+  "16": "us-west-1",
+  "17": "eu-central-1",
+  "18": "ap-southeast-1"
+};
+
+const s3Client = new S3Client({
+  region: agoraRegionMap[AGORA_AWS_REGION] || "us-east-1",
+  credentials: {
+    accessKeyId: AGORA_AWS_ACCESS_KEY,
+    secretAccessKey: AGORA_AWS_SECRET_KEY,
+  },
+});
+
+app.get('/api/recordings', async (req, res) => {
+  try {
+    console.log(`[BACKEND] Listing recordings from bucket: ${AGORA_AWS_BUCKET}, region: ${agoraRegionMap[AGORA_AWS_REGION] || "us-east-1"}`);
+    const command = new ListObjectsV2Command({
+      Bucket: AGORA_AWS_BUCKET,
+      Prefix: 'agora/recording/',
+    });
+
+    const data = await s3Client.send(command);
+    if (!data.Contents) return res.json([]);
+
+    // Group files by SID (prefix before the first underscore in the filename, 
+    // but Agora structure might be agora/recording/channelName/sid_... )
+    // Let's refine the parsing based on common Agora S3 structure
+    
+    const recordingsMap = {};
+
+    for (const obj of data.Contents) {
+      const key = obj.Key;
+      const parts = key.split('/');
+      
+      // We expect agora/recording/{channelName}/{mode}/{filename}
+      if (parts.length < 5) {
+        // Fallback for old structure or unexpected files
+        if (parts.length < 4) continue;
+        const channelName = parts[2];
+        const filename = parts[3];
+        const sid = filename.split('_')[0];
+        const mode = filename.includes('mix') ? 'mix' : (filename.includes('web') ? 'web' : 'individual');
+        addToMap(sid, channelName, mode, obj);
+        continue;
+      }
+
+      const channelName = parts[2];
+      const mode = parts[3];
+      const filename = parts[4];
+      const sid = filename.split('_')[0];
+
+      addToMap(sid, channelName, mode, obj);
+    }
+
+    function addToMap(sid, channelName, mode, obj) {
+      if (!recordingsMap[sid]) {
+        recordingsMap[sid] = {
+          sid,
+          channelName,
+          mode,
+          files: [],
+          timestamp: obj.LastModified,
+          size: 0
+        };
+      }
+      recordingsMap[sid].files.push({ key: obj.Key, filename: obj.Key.split('/').pop(), size: obj.Size, lastModified: obj.LastModified });
+      recordingsMap[sid].size += obj.Size;
+      if (obj.LastModified > recordingsMap[sid].timestamp) recordingsMap[sid].timestamp = obj.LastModified;
+    }
+
+    // Generate signed URLs for all video files in the grouped recordings
+    for (const sid in recordingsMap) {
+      const rec = recordingsMap[sid];
+      for (const file of rec.files) {
+        if (file.filename.endsWith('.mp4') || file.filename.endsWith('.webm')) {
+          const getObjCmd = new GetObjectCommand({ Bucket: AGORA_AWS_BUCKET, Key: file.key });
+          file.url = await getSignedUrl(s3Client, getObjCmd, { expiresIn: 3600 });
+        }
+      }
+    }
+
+    const result = Object.values(recordingsMap).sort((a, b) => b.timestamp - a.timestamp);
+    res.json(result);
+  } catch (error) {
+    console.error('Error listing recordings:', error);
+    res.status(500).json({ error: 'Failed to list recordings' });
+  }
+});
+
+app.delete('/api/recordings/:sid', async (req, res) => {
+  const { sid } = req.params;
+  try {
+    // First list objects with this SID to delete them all
+    const listCmd = new ListObjectsV2Command({
+      Bucket: AGORA_AWS_BUCKET,
+      Prefix: 'agora/recording/',
+    });
+    const listData = await s3Client.send(listCmd);
+    
+    const objectsToDelete = listData.Contents
+      ?.filter(obj => obj.Key.includes(sid))
+      .map(obj => ({ Key: obj.Key }));
+
+    if (!objectsToDelete || objectsToDelete.length === 0) {
+      return res.status(404).json({ error: 'No files found for this SID' });
+    }
+
+    const deleteCmd = new DeleteObjectsCommand({
+      Bucket: AGORA_AWS_BUCKET,
+      Delete: { Objects: objectsToDelete }
+    });
+
+    await s3Client.send(deleteCmd);
+    res.json({ message: 'Deleted successfully', deletedCount: objectsToDelete.length });
+  } catch (error) {
+    console.error('Error deleting recording:', error);
+    res.status(500).json({ error: 'Failed to delete recording' });
   }
 });
 
