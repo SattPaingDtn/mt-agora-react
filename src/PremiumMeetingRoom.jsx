@@ -421,7 +421,10 @@ export default function PremiumMeetingRoom({ channelName = 'MT_Test', displayNam
         });
         const startData = await startRes.json();
 
-        if (!startRes.ok) throw new Error(startData.error || 'Failed to start');
+        if (!startRes.ok) {
+          const errorMsg = startData.reason || startData.error || 'Failed to start';
+          throw new Error(errorMsg);
+        }
 
         setRecordingData({ resourceId, sid: startData.sid, uidUsed: uidToUse });
         setIsRecording(true);

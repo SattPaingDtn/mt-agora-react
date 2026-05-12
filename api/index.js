@@ -112,9 +112,10 @@ app.post('/api/recording/start', async (req, res) => {
   const { resourceId, mode, channelName, uid, token } = req.body;
   if (!resourceId || !mode || !channelName || !uid) return res.status(400).json({ error: 'Missing parameters' });
 
+  const regionInt = parseInt(AGORA_AWS_REGION, 10);
   const storageConfig = {
     vendor: 1,
-    region: parseInt(AGORA_AWS_REGION),
+    region: isNaN(regionInt) ? 8 : regionInt,
     bucket: AGORA_AWS_BUCKET,
     accessKey: AGORA_AWS_ACCESS_KEY,
     secretKey: AGORA_AWS_SECRET_KEY,
