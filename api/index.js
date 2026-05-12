@@ -23,10 +23,10 @@ const {
   AGORA_APP_CERTIFICATE,
   AGORA_CUSTOMER_ID,
   AGORA_CUSTOMER_SECRET,
-  AWS_ACCESS_KEY,
-  AWS_SECRET_KEY,
-  AWS_REGION,
-  AWS_BUCKET
+  AGORA_AWS_ACCESS_KEY,
+  AGORA_AWS_SECRET_KEY,
+  AGORA_AWS_REGION,
+  AGORA_AWS_BUCKET
 } = process.env;
 
 import pkg from 'agora-token';
@@ -112,10 +112,10 @@ app.post('/api/recording/start', async (req, res) => {
 
   const storageConfig = {
     vendor: 1,
-    region: parseInt(AWS_REGION),
-    bucket: AWS_BUCKET,
-    accessKey: AWS_ACCESS_KEY,
-    secretKey: AWS_SECRET_KEY,
+    region: parseInt(AGORA_AWS_REGION),
+    bucket: AGORA_AWS_BUCKET,
+    accessKey: AGORA_AWS_ACCESS_KEY,
+    secretKey: AGORA_AWS_SECRET_KEY,
     fileNamePrefix: ["agora", "recording", channelName]
   };
 
