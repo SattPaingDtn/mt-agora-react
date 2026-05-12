@@ -127,6 +127,22 @@ app.post('/api/recording/start', async (req, res) => {
     recordingConfig.subscribeAudioUids = ["#allstream#"];
   } else if (mode === 'mix') {
     recordingConfig.transcodingConfig = { height: 720, width: 1280, bitrate: 1500, fps: 30, mixedVideoLayout: 1, backgroundColor: "#000000" };
+  } else if (mode === 'web') {
+    // For Web Recording, we need a URL to record. 
+    // Defaulting to a placeholder or the current app landing if possible.
+    recordingConfig.extensionServiceConfig = {
+      errorHandlePolicy: "error",
+      extensionServices: [{
+        serviceName: "web-recorder-service",
+        errorHandlePolicy: "error",
+        serviceParam: {
+          url: "https://www.google.com", // Placeholder: User should ideally provide this
+          width: 1280,
+          height: 720,
+          isStandard: true
+        }
+      }]
+    };
   }
 
   try {
@@ -164,7 +180,7 @@ const agoraRegionMap = {
   "0": "us-east-1",
   "1": "us-east-2",
   "2": "us-west-1",
-  "3": "ap-northeast-1", // Fixed for user's specific bucket location
+  "3": "us-west-2",
   "4": "eu-west-1",
   "5": "eu-central-1",
   "6": "ap-southeast-1",
