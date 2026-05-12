@@ -442,6 +442,34 @@
   margin: 0 4px;
 }
 
+/* Recording Controls Group */
+.recordingGroup {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: rgba(212, 175, 55, 0.05);
+  padding: 4px 4px 4px 16px;
+  border-radius: 30px;
+  border: 1px solid rgba(212, 175, 55, 0.15);
+}
+
+.recordingSelect {
+  background: transparent;
+  border: none;
+  color: #D4AF37;
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  cursor: pointer;
+  outline: none;
+}
+
+.recordingSelect option {
+  background: #1a1a1a;
+  color: #fff;
+}
+
 /* ---------- Responsive ---------- */
 @media (max-width: 768px) {
   .header {

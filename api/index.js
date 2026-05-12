@@ -54,7 +54,6 @@ app.get('/api/token', (req, res) => {
       channelName,
       uidNumber,
       RtcRole.PUBLISHER,
-      expirationTimeInSeconds,
       privilegeExpiredTs
     );
 
@@ -68,9 +67,9 @@ app.get('/api/token', (req, res) => {
     );
 
     console.log(`[BACKEND] Token requested for channel: ${channelName}, RTC UID: ${uidNumber}, RTM UserID: ${rtmUserId}`);
-    
-    res.json({ 
-      token: rtcToken, 
+
+    res.json({
+      token: rtcToken,
       rtmToken: rtmToken,
       rtmUserId: rtmUserId,
       appId: AGORA_APP_ID
@@ -93,85 +92,131 @@ app.post('/api/recording/acquire', async (req, res) => {
   if (!channelName || !uid) return res.status(400).json({ error: 'channelName and uid are required' });
 
   try {
-    const response = await axios.post(
-      `https://api.sd-rtn.com/v1/apps/${AGORA_APP_ID}/cloud_recording/acquire`,
-      {
-        cname: channelName,
-        uid: uid.toString(),
-        clientRequest: { resourceExpiredHour: 24, scene: 0 }
-      },
-      { headers: { 'Authorization': getAuthHeader(), 'Content-Type': 'application/json' } }
-    );
+    const acquireUrl = `https://api.sd-rtn.com/v1/apps/${AGORA_APP_ID}/cloud_recording/acquire`;
+    const acquirePayload = {
+      cname: channelName,
+      uid: uid.toString(),
+      clientRequest: { resourceExpiredHour: 24, scene: 0 }
+    };
+    
+    console.log(`[RECORDING] Acquiring at: ${acquireUrl}`);
+    const response = await axios.post(acquireUrl, acquirePayload, { 
+      headers: { 'Authorization': getAuthHeader(), 'Content-Type': 'application/json' } 
+    });
+    
+    console.log(`[RECORDING] Acquire Success:`, response.data);
     res.json(response.data);
   } catch (error) {
+    console.error('[RECORDING ACQUIRE ERROR]:', error.response?.data || error.message);
     res.status(500).json(error.response?.data || { error: 'Failed to acquire resource ID' });
   }
 });
 
 app.post('/api/recording/start', async (req, res) => {
-  const { resourceId, mode, channelName, uid, token } = req.body;
+  const { resourceId, mode, channelName, uid } = req.body;
   if (!resourceId || !mode || !channelName || !uid) return res.status(400).json({ error: 'Missing parameters' });
 
-  const regionInt = parseInt(AGORA_AWS_REGION, 10);
+  const expirationTimeInSeconds = 3600 * 24;
+  const currentTimestamp = Math.floor(Date.now() / 1000);
+  const privilegeExpiredTs = currentTimestamp + expirationTimeInSeconds;
+
+  const recordingToken = RtcTokenBuilder.buildTokenWithUid(
+    AGORA_APP_ID, 
+    AGORA_APP_CERTIFICATE, 
+    channelName, 
+    parseInt(uid, 10), 
+    RtcRole.PUBLISHER, 
+    privilegeExpiredTs
+  );
+
+  const getAgoraRegionId = (region) => {
+    if (!isNaN(parseInt(region, 10))) return parseInt(region, 10);
+    const map = {
+      "us-east-1": 0, "us-east-2": 1, "us-west-1": 2, "us-west-2": 3,
+      "eu-west-1": 4, "eu-central-1": 5, "ap-southeast-1": 6, "ap-southeast-2": 7,
+      "ap-northeast-1": 8, "sa-east-1": 9, "ca-central-1": 10, "eu-west-2": 11,
+      "ap-northeast-2": 12, "ap-south-1": 13
+    };
+    return map[region] || 8;
+  };
+
   const storageConfig = {
-    vendor: 1,
-    region: isNaN(regionInt) ? 8 : regionInt,
+    vendor: 1, 
+    region: getAgoraRegionId(AGORA_AWS_REGION),
     bucket: AGORA_AWS_BUCKET,
     accessKey: AGORA_AWS_ACCESS_KEY,
     secretKey: AGORA_AWS_SECRET_KEY,
-    fileNamePrefix: ["agora", "recording", channelName, mode]
+    fileNamePrefix: [`agora/recording/${channelName}`]
   };
 
-  let recordingConfig = { maxIdleTime: 30, streamTypes: 2, channelType: 0 };
-  if (mode === 'individual') {
-    recordingConfig.subscribeVideoUids = ["#allstream#"];
-    recordingConfig.subscribeAudioUids = ["#allstream#"];
-  } else if (mode === 'mix') {
-    recordingConfig.transcodingConfig = { height: 720, width: 1280, bitrate: 1500, fps: 30, mixedVideoLayout: 1, backgroundColor: "#000000" };
-  } else if (mode === 'web') {
-    // For Web Recording, we need a URL to record. 
-    // Defaulting to a placeholder or the current app landing if possible.
-    recordingConfig.extensionServiceConfig = {
-      errorHandlePolicy: "error",
-      extensionServices: [{
-        serviceName: "web-recorder-service",
-        errorHandlePolicy: "error",
-        serviceParam: {
-          url: "https://www.google.com", // Placeholder: User should ideally provide this
-          width: 1280,
-          height: 720,
-          isStandard: true
-        }
-      }]
-    };
-  }
-
   try {
-    const response = await axios.post(
-      `https://api.sd-rtn.com/v1/apps/${AGORA_APP_ID}/cloud_recording/resourceid/${resourceId}/mode/${mode}/start`,
-      {
-        cname: channelName,
-        uid: uid.toString(),
-        clientRequest: { token: token || "", recordingConfig, recordingFileConfig: { avFileType: ["hls", "mp4"] }, storageConfig }
-      },
-      { headers: { 'Authorization': getAuthHeader(), 'Content-Type': 'application/json' } }
-    );
+    const agoraMode = mode === 'web' ? 'web_recorder' : mode;
+    const startUrl = `https://api.sd-rtn.com/v1/apps/${AGORA_APP_ID}/cloud_recording/resourceid/${resourceId}/mode/${agoraMode}/start`;
+
+    const startPayload = {
+      cname: channelName,
+      uid: uid.toString(),
+      clientRequest: {
+        token: recordingToken,
+        recordingConfig: {
+          maxIdleTime: 30,
+          streamTypes: 2,
+          channelType: 0
+        },
+        recordingFileConfig: {
+          avFileType: mode === 'individual' ? ["hls"] : ["hls", "mp4"]
+        },
+        storageConfig
+      }
+    };
+
+    if (agoraMode === 'mix') {
+      startPayload.clientRequest.recordingConfig.subscribeAudioUids = ["#allstream#"];
+      startPayload.clientRequest.recordingConfig.subscribeVideoUids = ["#allstream#"];
+      startPayload.clientRequest.recordingConfig.subscribeUidGroup = 0;
+      startPayload.clientRequest.recordingConfig.transcodingConfig = { height: 720, width: 1280, bitrate: 1500, fps: 30, mixedVideoLayout: 1, backgroundColor: "#000000" };
+    } else if (agoraMode === 'individual') {
+      startPayload.clientRequest.recordingConfig.subscribeAudioUids = ["#allstream#"];
+      startPayload.clientRequest.recordingConfig.subscribeVideoUids = ["#allstream#"];
+    } else if (agoraMode === 'web_recorder') {
+      startPayload.clientRequest.extensionServiceConfig = {
+        errorHandlePolicy: "error",
+        extensionServices: [{
+          serviceName: "web-recorder-service",
+          serviceParam: { url: req.body.url, width: 1280, height: 720, isAudio: true }
+        }]
+      };
+    }
+
+    console.log(`[RECORDING] Starting ${agoraMode} at: ${startUrl}`);
+    const response = await axios.post(startUrl, startPayload, { 
+      headers: { 'Authorization': getAuthHeader(), 'Content-Type': 'application/json' } 
+    });
+    
+    console.log(`[RECORDING] Start Result:`, response.data);
     res.json(response.data);
   } catch (error) {
+    console.error('[RECORDING START ERROR]:', error.response?.data || error.message);
     res.status(500).json(error.response?.data || { error: 'Failed to start recording' });
   }
 });
 
 app.post('/api/recording/stop', async (req, res) => {
   const { resourceId, sid, mode, channelName, uid } = req.body;
+  const agoraMode = mode === 'web' ? 'web_recorder' : mode;
+  
   try {
-    const response = await axios.post(
-      `https://api.sd-rtn.com/v1/apps/${AGORA_APP_ID}/cloud_recording/resourceid/${resourceId}/sid/${sid}/mode/${mode}/stop`,
-      { cname: channelName, uid: uid.toString(), clientRequest: {} },
-      { headers: { 'Authorization': getAuthHeader(), 'Content-Type': 'application/json' } }
-    );
+    const stopUrl = `https://api.sd-rtn.com/v1/apps/${AGORA_APP_ID}/cloud_recording/resourceid/${resourceId}/sid/${sid}/mode/${agoraMode}/stop`;
+    console.log(`[RECORDING] Stopping at: ${stopUrl}`);
+    
+    const response = await axios.post(stopUrl, { cname: channelName, uid: uid.toString(), clientRequest: {} }, { 
+      headers: { 'Authorization': getAuthHeader(), 'Content-Type': 'application/json' } 
+    });
+    
+    console.log(`[RECORDING] Stop Success:`, response.data);
     res.json(response.data);
   } catch (error) {
+    console.error('[RECORDING STOP ERROR]:', error.response?.data || error.message);
     res.status(500).json(error.response?.data || { error: 'Failed to stop recording' });
   }
 });
@@ -221,13 +266,13 @@ app.get('/api/recordings', async (req, res) => {
     // Group files by SID (prefix before the first underscore in the filename, 
     // but Agora structure might be agora/recording/channelName/sid_... )
     // Let's refine the parsing based on common Agora S3 structure
-    
+
     const recordingsMap = {};
 
     for (const obj of data.Contents) {
       const key = obj.Key;
       const parts = key.split('/');
-      
+
       // We expect agora/recording/{channelName}/{mode}/{filename}
       if (parts.length < 5) {
         // Fallback for old structure or unexpected files
@@ -269,7 +314,7 @@ app.get('/api/recordings', async (req, res) => {
     for (const sid in recordingsMap) {
       const rec = recordingsMap[sid];
       for (const file of rec.files) {
-        if (file.filename.endsWith('.mp4') || file.filename.endsWith('.webm')) {
+        if (file.filename.endsWith('.mp4') || file.filename.endsWith('.webm') || file.filename.endsWith('.ts') || file.filename.endsWith('.m3u8')) {
           const getObjCmd = new GetObjectCommand({ Bucket: AGORA_AWS_BUCKET, Key: file.key });
           signingPromises.push(
             getSignedUrl(s3Client, getObjCmd, { expiresIn: 3600 })
@@ -289,33 +334,107 @@ app.get('/api/recordings', async (req, res) => {
   }
 });
 
+app.get('/api/playlist', async (req, res) => {
+  const { key } = req.query;
+  if (!key) return res.status(400).send('Missing key');
+
+  try {
+    const getObjCmd = new GetObjectCommand({ Bucket: AGORA_AWS_BUCKET, Key: key });
+    const response = await s3Client.send(getObjCmd);
+
+    const chunks = [];
+    for await (const chunk of response.Body) chunks.push(chunk);
+    const content = Buffer.concat(chunks).toString('utf-8');
+
+    // Parse the playlist and rewrite segment URLs to point back to our segment proxy
+    const lines = content.split('\n');
+    const folder = key.split('/').slice(0, -1).join('/');
+
+    const rewrittenLines = lines.map(line => {
+      const trimmed = line.trim();
+      if (trimmed && !trimmed.startsWith('#')) {
+        // Create a URL for our segment proxy
+        const segmentKey = folder ? `${folder}/${trimmed}` : trimmed;
+        return `/api/playlist/segment?key=${encodeURIComponent(segmentKey)}`;
+      }
+      return line;
+    });
+
+    res.setHeader('Content-Type', 'application/vnd.apple.mpegurl');
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.send(rewrittenLines.join('\n'));
+  } catch (error) {
+    console.error(`[PROXY] Error:`, error.message);
+    res.status(500).send('Playlist error');
+  }
+});
+
+app.get('/api/playlist/segment', async (req, res) => {
+  const { key } = req.query;
+  if (!key) return res.status(400).send('Missing key');
+
+  try {
+    const getObjCmd = new GetObjectCommand({ Bucket: AGORA_AWS_BUCKET, Key: key });
+    const response = await s3Client.send(getObjCmd);
+
+    res.setHeader('Content-Type', response.ContentType || 'video/mp2t');
+    res.setHeader('Access-Control-Allow-Origin', '*');
+
+    // Pipe the S3 stream directly to the response
+    response.Body.pipe(res);
+  } catch (error) {
+    console.error(`[SEGMENT] Error:`, error.message);
+    res.status(500).send('Segment error');
+  }
+});
+
 app.delete('/api/recordings/:sid', async (req, res) => {
   const { sid } = req.params;
-  try {
-    // First list objects with this SID to delete them all
-    const listCmd = new ListObjectsV2Command({
-      Bucket: AGORA_AWS_BUCKET,
-      Prefix: 'agora/recording/',
-    });
-    const listData = await s3Client.send(listCmd);
-    
-    const objectsToDelete = listData.Contents
-      ?.filter(obj => obj.Key.includes(sid))
-      .map(obj => ({ Key: obj.Key }));
+  console.log(`[BACKEND] Deleting recording with SID: ${sid}`);
 
-    if (!objectsToDelete || objectsToDelete.length === 0) {
+  try {
+    let allObjectsToDelete = [];
+    let continuationToken = null;
+
+    // Paginate through S3 to find all objects with this SID
+    do {
+      const listCmd = new ListObjectsV2Command({
+        Bucket: AGORA_AWS_BUCKET,
+        Prefix: 'agora/recording/',
+        ContinuationToken: continuationToken
+      });
+
+      const listData = await s3Client.send(listCmd);
+      if (listData.Contents) {
+        const matches = listData.Contents
+          .filter(obj => obj.Key.includes(sid))
+          .map(obj => ({ Key: obj.Key }));
+        allObjectsToDelete = allObjectsToDelete.concat(matches);
+      }
+      continuationToken = listData.NextContinuationToken;
+    } while (continuationToken);
+
+    if (allObjectsToDelete.length === 0) {
+      console.log(`[BACKEND] No files found for SID: ${sid}`);
       return res.status(404).json({ error: 'No files found for this SID' });
     }
 
-    const deleteCmd = new DeleteObjectsCommand({
-      Bucket: AGORA_AWS_BUCKET,
-      Delete: { Objects: objectsToDelete }
-    });
+    console.log(`[BACKEND] Found ${allObjectsToDelete.length} objects to delete for SID ${sid}`);
 
-    await s3Client.send(deleteCmd);
-    res.json({ message: 'Deleted successfully', deletedCount: objectsToDelete.length });
+    // S3 DeleteObjects supports max 1000 keys per request
+    for (let i = 0; i < allObjectsToDelete.length; i += 1000) {
+      const chunk = allObjectsToDelete.slice(i, i + 1000);
+      const deleteCmd = new DeleteObjectsCommand({
+        Bucket: AGORA_AWS_BUCKET,
+        Delete: { Objects: chunk }
+      });
+      await s3Client.send(deleteCmd);
+    }
+
+    console.log(`[BACKEND] Successfully deleted SID: ${sid}`);
+    res.json({ message: 'Deleted successfully', deletedCount: allObjectsToDelete.length });
   } catch (error) {
-    console.error('Error deleting recording:', error);
+    console.error(`[BACKEND] Error deleting recording ${sid}:`, error);
     res.status(500).json({ error: 'Failed to delete recording' });
   }
 });
@@ -327,11 +446,11 @@ app.post('/api/rtmp/start', async (req, res) => {
 
   const lid = localUid ? parseInt(localUid, 10) : 0;
   const rids = remoteUids.map(id => parseInt(id, 10));
-  
+
   const expirationTimeInSeconds = 3600;
   const currentTimestamp = Math.floor(Date.now() / 1000);
   const privilegeExpiredTs = currentTimestamp + expirationTimeInSeconds;
-  
+
   const converterToken = RtcTokenBuilder.buildTokenWithUid(AGORA_APP_ID, AGORA_APP_CERTIFICATE, channelName, parseInt(uid, 10), RtcRole.PUBLISHER, expirationTimeInSeconds, privilegeExpiredTs);
 
   const mainUid = (lid && lid !== 0) ? lid : (rids[0] || 0);
@@ -358,7 +477,7 @@ app.post('/api/rtmp/start', async (req, res) => {
           audioOptions: { codecProfile: "LC-AAC", sampleRate: 48000, bitrate: 128, audioChannels: 2, rtcStreamUids: allStreamUids },
           videoOptions: { canvas: { width: parseInt(width || 1280, 10), height: parseInt(height || 720, 10), color: 0 }, layout: layout, bitrate: parseInt(bitrate || 2500, 10), frameRate: parseInt(fps || 30, 10) }
         },
-        token: converterToken 
+        token: converterToken
       }
     }, { headers: { 'Authorization': getAuthHeader(), 'Content-Type': 'application/json' } });
     res.json(response.data);
@@ -370,7 +489,7 @@ app.post('/api/rtmp/start', async (req, res) => {
 app.post('/api/rtmp/stop', async (req, res) => {
   let { converterId } = req.body;
   if (typeof req.body === 'string') {
-    try { converterId = JSON.parse(req.body).converterId; } catch (e) {}
+    try { converterId = JSON.parse(req.body).converterId; } catch (e) { }
   }
   if (!converterId) return res.status(400).json({ error: 'converterId is required' });
 
@@ -385,11 +504,9 @@ app.post('/api/rtmp/stop', async (req, res) => {
   }
 });
 
-// For local development
-if (process.env.NODE_ENV !== 'production') {
-  app.listen(port, () => {
-    console.log(`Backend server listening on port ${port}`);
-  });
-}
+// Start server for local development
+app.listen(port, () => {
+  console.log(`Backend server listening on port ${port}`);
+});
 
 export default app;
