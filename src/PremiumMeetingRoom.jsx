@@ -396,12 +396,12 @@ export default function PremiumMeetingRoom({ channelName = 'MT_Test', displayNam
       if (!isRecording) {
         // The Cloud Recording Bot MUST have its own unique UID to join the channel.
         // It cannot use localUid, otherwise it kicks the host out!
-        const uidToUse = Math.floor(Math.random() * 1000000);
+        const uidToUse = Math.floor(Math.random() * 999999) + 1;
 
         const acquireRes = await fetch('/api/recording/acquire', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ channelName, uid: uidToUse })
+          body: JSON.stringify({ channelName, uid: uidToUse, mode: recordingMode })
         });
         const acquireData = await acquireRes.json();
 
@@ -416,13 +416,14 @@ export default function PremiumMeetingRoom({ channelName = 'MT_Test', displayNam
             mode: recordingMode,
             channelName,
             uid: uidToUse,
-            token: dynamicToken
+            token: dynamicToken,
+            url: recordingMode === 'web' ? window.location.origin : undefined
           })
         });
         const startData = await startRes.json();
 
-        if (!startRes.ok) {
-          const errorMsg = startData.reason || startData.error || 'Failed to start';
+        if (!startRes.ok || (startData?.code !== undefined && startData?.code !== 0) || !startData?.sid) {
+          const errorMsg = startData?.reason || startData?.error || 'Failed to start';
           throw new Error(errorMsg);
         }
 
@@ -730,16 +731,17 @@ export default function PremiumMeetingRoom({ channelName = 'MT_Test', displayNam
         <div className={styles.controlDivider} />
 
         {/* Cloud Recording */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', background: 'rgba(255,255,255,0.05)', padding: '4px', borderRadius: '8px' }}>
+        <div className={styles.recordingGroup}>
+          <span className={styles.recordingLabel}>Recording</span>
           <select
             value={recordingMode}
             onChange={(e) => setRecordingMode(e.target.value)}
             disabled={isRecording || isRecordingLoading}
-            style={{ background: 'transparent', color: '#fff', border: '1px solid rgba(255,255,255,0.2)', borderRadius: '4px', padding: '4px', outline: 'none' }}
+            className={styles.recordingSelect}
           >
-            <option value="mix" style={{ color: '#000' }}>Mix</option>
-            <option value="individual" style={{ color: '#000' }}>Individual</option>
-            <option value="web" style={{ color: '#000' }}>Web</option>
+            <option value="mix">Mix</option>
+            <option value="individual">Individual</option>
+            <option value="web">Web</option>
           </select>
 
           <button

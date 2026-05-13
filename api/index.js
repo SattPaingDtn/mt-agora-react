@@ -88,15 +88,17 @@ const getAuthHeader = () => {
 
 // --- Recording Endpoints ---
 app.post('/api/recording/acquire', async (req, res) => {
-  const { channelName, uid } = req.body;
+  const { channelName, uid, mode } = req.body;
   if (!channelName || !uid) return res.status(400).json({ error: 'channelName and uid are required' });
+
+  const scene = mode === 'web' ? 1 : 0;
 
   try {
     const acquireUrl = `https://api.sd-rtn.com/v1/apps/${AGORA_APP_ID}/cloud_recording/acquire`;
     const acquirePayload = {
       cname: channelName,
       uid: uid.toString(),
-      clientRequest: { resourceExpiredHour: 24, scene: 0 }
+      clientRequest: { resourceExpiredHour: 24, scene }
     };
     
     console.log(`[RECORDING] Acquiring at: ${acquireUrl}`);
@@ -140,17 +142,25 @@ app.post('/api/recording/start', async (req, res) => {
     return map[region] || 8;
   };
 
+  const getFileNamePrefix = (...parts) => {
+    return parts
+      .filter(Boolean)
+      .flatMap((part) => `${part}`.split('/'))
+      .map((value) => value.trim())
+      .filter(Boolean);
+  };
+
   const storageConfig = {
-    vendor: 1, 
+    vendor: 1,
     region: getAgoraRegionId(AGORA_AWS_REGION),
     bucket: AGORA_AWS_BUCKET,
     accessKey: AGORA_AWS_ACCESS_KEY,
     secretKey: AGORA_AWS_SECRET_KEY,
-    fileNamePrefix: [`agora/recording/${channelName}`]
+    fileNamePrefix: getFileNamePrefix('agora', 'recording', channelName)
   };
 
   try {
-    const agoraMode = mode === 'web' ? 'web_recorder' : mode;
+    const agoraMode = mode === 'web' ? 'web' : mode;
     const startUrl = `https://api.sd-rtn.com/v1/apps/${AGORA_APP_ID}/cloud_recording/resourceid/${resourceId}/mode/${agoraMode}/start`;
 
     const startPayload = {
@@ -161,7 +171,8 @@ app.post('/api/recording/start', async (req, res) => {
         recordingConfig: {
           maxIdleTime: 30,
           streamTypes: 2,
-          channelType: 0
+          channelType: 0,
+          subscribeUidGroup: 0
         },
         recordingFileConfig: {
           avFileType: mode === 'individual' ? ["hls"] : ["hls", "mp4"]
@@ -173,27 +184,69 @@ app.post('/api/recording/start', async (req, res) => {
     if (agoraMode === 'mix') {
       startPayload.clientRequest.recordingConfig.subscribeAudioUids = ["#allstream#"];
       startPayload.clientRequest.recordingConfig.subscribeVideoUids = ["#allstream#"];
-      startPayload.clientRequest.recordingConfig.subscribeUidGroup = 0;
       startPayload.clientRequest.recordingConfig.transcodingConfig = { height: 720, width: 1280, bitrate: 1500, fps: 30, mixedVideoLayout: 1, backgroundColor: "#000000" };
     } else if (agoraMode === 'individual') {
       startPayload.clientRequest.recordingConfig.subscribeAudioUids = ["#allstream#"];
       startPayload.clientRequest.recordingConfig.subscribeVideoUids = ["#allstream#"];
-    } else if (agoraMode === 'web_recorder') {
+    } else if (agoraMode === 'web') {
+      const fallbackUrl = req.body.url || req.get('origin') || `https://${req.get('host')}`;
+
+      startPayload.clientRequest.recordingConfig = {
+        maxIdleTime: 30,
+        streamTypes: 2,
+        channelType: 0,
+        subscribeUidGroup: 0
+      };
+      startPayload.clientRequest.recordingFileConfig = {
+        avFileType: ["hls", "mp4"]
+      };
       startPayload.clientRequest.extensionServiceConfig = {
-        errorHandlePolicy: "error",
+        errorHandlePolicy: "error_abort",
         extensionServices: [{
-          serviceName: "web-recorder-service",
-          serviceParam: { url: req.body.url, width: 1280, height: 720, isAudio: true }
+          serviceName: "web_recorder_service",
+          errorHandlePolicy: "error_abort",
+          serviceParam: {
+            url: fallbackUrl,
+            audioProfile: 0,
+            videoWidth: 1280,
+            videoHeight: 720,
+            maxRecordingHour: 1,
+            videoBitrate: 1500,
+            videoFps: 15,
+            mobile: false,
+            maxVideoDuration: 120,
+            onhold: false,
+            readyTimeout: 0
+          }
         }]
       };
     }
 
+    const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+    const attemptStart = async (attempt = 1) => {
+      const response = await axios.post(startUrl, startPayload, { 
+        headers: { 'Authorization': getAuthHeader(), 'Content-Type': 'application/json' } 
+      });
+
+      if (response.data?.code === 65 && attempt < 3) {
+        const backoff = attempt === 1 ? 3000 : 6000;
+        console.log(`[RECORDING] Start returned code 65, retrying after ${backoff}ms (attempt ${attempt + 1})`);
+        await delay(backoff);
+        return attemptStart(attempt + 1);
+      }
+
+      return response;
+    };
+
     console.log(`[RECORDING] Starting ${agoraMode} at: ${startUrl}`);
-    const response = await axios.post(startUrl, startPayload, { 
-      headers: { 'Authorization': getAuthHeader(), 'Content-Type': 'application/json' } 
-    });
-    
+    const response = await attemptStart();
+
     console.log(`[RECORDING] Start Result:`, response.data);
+    if ((response.data?.code !== undefined && response.data?.code !== 0) || !response.data?.sid) {
+      return res.status(500).json(response.data || { error: 'Failed to start recording' });
+    }
+
     res.json(response.data);
   } catch (error) {
     console.error('[RECORDING START ERROR]:', error.response?.data || error.message);
@@ -203,7 +256,7 @@ app.post('/api/recording/start', async (req, res) => {
 
 app.post('/api/recording/stop', async (req, res) => {
   const { resourceId, sid, mode, channelName, uid } = req.body;
-  const agoraMode = mode === 'web' ? 'web_recorder' : mode;
+  const agoraMode = mode === 'web' ? 'web' : mode;
   
   try {
     const stopUrl = `https://api.sd-rtn.com/v1/apps/${AGORA_APP_ID}/cloud_recording/resourceid/${resourceId}/sid/${sid}/mode/${agoraMode}/stop`;
