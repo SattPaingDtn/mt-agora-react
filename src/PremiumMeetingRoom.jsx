@@ -307,6 +307,7 @@ export default function PremiumMeetingRoom({ channelName = 'MT_Test', displayNam
   const { localMicrophoneTrack } = useLocalMicrophoneTrack(micOn);
   const { localCameraTrack } = useLocalCameraTrack(cameraOn);
   usePublish([localMicrophoneTrack, localCameraTrack]);
+  const rtcClient = useRTCClient();
 
   const remoteUsers = useRemoteUsers();
 
@@ -490,11 +491,14 @@ export default function PremiumMeetingRoom({ channelName = 'MT_Test', displayNam
       const data = await res.json();
       if (!res.ok) throw new Error(data.reason || data.error || 'Failed to start RTMP stream');
 
-      setConverterId(data.converterId);
+      const parsedConverterId = data.converterId || data.id || data.converter?.id;
+      if (!parsedConverterId) throw new Error('Missing RTMP converter ID in start response');
+
+      setConverterId(parsedConverterId);
       setStreamingUrl(rtmpUrl);
       setIsStreaming(true);
       setShowRTMPModal(false);
-      console.log('[LUXE MEET] RTMP Streaming started:', data.converterId);
+      console.log('[LUXE MEET] RTMP Streaming started:', parsedConverterId);
     } catch (err) {
       console.error("[LUXE MEET] RTMP Error:", err);
       alert("RTMP Error: " + err.message);
@@ -534,36 +538,83 @@ export default function PremiumMeetingRoom({ channelName = 'MT_Test', displayNam
   /** End the call and notify parent */
   const handleEndCall = useCallback(async () => {
     console.log('[LUXE MEET] Ending call and cleaning up...');
-    
+
     // 1. Stop RTMP Stream if active
     if (isStreaming) {
       await handleStopRTMP();
     }
-    
-    // 2. Stop tracks
+
+    // 2. Leave Agora explicitly before releasing local tracks
+    if (rtcClient) {
+      try {
+        await rtcClient.leave();
+        console.log('[LUXE MEET] Left Agora channel');
+      } catch (leaveError) {
+        console.warn('[LUXE MEET] Agora leave failed', leaveError);
+      }
+    }
+
+    // 3. Stop local media tracks and clear local device usage
     if (localCameraTrack) {
-      localCameraTrack.stop();
-      localCameraTrack.close();
+      try {
+        localCameraTrack.stop();
+        localCameraTrack.close();
+      } catch (trackError) {
+        console.warn('[LUXE MEET] Camera track stop/close failed', trackError);
+      }
     }
     if (localMicrophoneTrack) {
-      localMicrophoneTrack.stop();
-      localMicrophoneTrack.close();
+      try {
+        localMicrophoneTrack.stop();
+        localMicrophoneTrack.close();
+      } catch (trackError) {
+        console.warn('[LUXE MEET] Microphone track stop/close failed', trackError);
+      }
     }
 
-    // 3. Clear timers
+    setCameraOn(false);
+    setMicOn(false);
+
+    // 4. Clear timers
     clearInterval(timerRef.current);
 
-    // 4. Leave Agora (handled by agora-rtc-react, but we can be explicit)
+    // 5. Notify parent to exit meeting UI
     if (onLeave) onLeave();
-  }, [onLeave, localCameraTrack, localMicrophoneTrack, handleStopRTMP, isStreaming]);
+  }, [onLeave, localCameraTrack, localMicrophoneTrack, handleStopRTMP, isStreaming, rtcClient]);
 
   // Comprehensive Cleanup (Tab close / Unmount)
   useEffect(() => {
     const cleanup = async () => {
-      if (isStreaming) {
+      if (isStreaming && converterId) {
         // Use navigator.sendBeacon for more reliable cleanup on tab close
-        const data = JSON.stringify({ converterId });
-        navigator.sendBeacon('/api/rtmp/stop', data);
+        const payload = new Blob([JSON.stringify({ converterId })], { type: 'application/json' });
+        navigator.sendBeacon('/api/rtmp/stop', payload);
+      }
+
+      if (rtcClient) {
+        try {
+          await rtcClient.leave();
+          console.log('[LUXE MEET] Cleanup left Agora channel');
+        } catch (leaveError) {
+          console.warn('[LUXE MEET] Cleanup Agora leave failed', leaveError);
+        }
+      }
+
+      if (localCameraTrack) {
+        try {
+          localCameraTrack.stop();
+          localCameraTrack.close();
+        } catch (trackError) {
+          console.warn('[LUXE MEET] Cleanup camera track error', trackError);
+        }
+      }
+      if (localMicrophoneTrack) {
+        try {
+          localMicrophoneTrack.stop();
+          localMicrophoneTrack.close();
+        } catch (trackError) {
+          console.warn('[LUXE MEET] Cleanup microphone track error', trackError);
+        }
       }
     };
 
@@ -573,7 +624,7 @@ export default function PremiumMeetingRoom({ channelName = 'MT_Test', displayNam
       window.removeEventListener('beforeunload', cleanup);
       cleanup();
     };
-  }, [isStreaming, converterId]);
+  }, [isStreaming, converterId, rtcClient, localCameraTrack, localMicrophoneTrack]);
 
   // ── Render ──────────────────────────────────────────────────
   return (

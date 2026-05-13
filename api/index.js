@@ -19,6 +19,7 @@ const port = process.env.PORT || 3001;
 
 app.use(cors());
 app.use(express.json());
+app.use(express.text({ type: 'text/*' }));
 
 const {
   AGORA_APP_ID,
@@ -524,9 +525,9 @@ app.post('/api/rtmp/start', async (req, res) => {
       converter: {
         name: `luxe_stream_${channelName}`,
         rtmpUrl: rtmpUrl,
-        rtcChannel: channelName,
         cname: channelName,
         transcodeOptions: {
+          rtcChannel: channelName,
           audioOptions: { codecProfile: "LC-AAC", sampleRate: 48000, bitrate: 128, audioChannels: 2, rtcStreamUids: allStreamUids },
           videoOptions: { canvas: { width: parseInt(width || 1280, 10), height: parseInt(height || 720, 10), color: 0 }, layout: layout, bitrate: parseInt(bitrate || 2500, 10), frameRate: parseInt(fps || 30, 10) }
         },
@@ -540,15 +541,21 @@ app.post('/api/rtmp/start', async (req, res) => {
 });
 
 app.post('/api/rtmp/stop', async (req, res) => {
-  let { converterId } = req.body;
-  if (typeof req.body === 'string') {
-    try { converterId = JSON.parse(req.body).converterId; } catch (e) { }
-  }
-  if (!converterId) return res.status(400).json({ error: 'converterId is required' });
+  const body = typeof req.body === 'string' ? (() => {
+    try {
+      return JSON.parse(req.body);
+    } catch (e) {
+      return {};
+    }
+  })() : req.body || {};
+
+  const { converterId, id } = body;
+  const stopId = converterId || id;
+  if (!stopId) return res.status(400).json({ error: 'converterId is required' });
 
   try {
     const region = 'ap';
-    const response = await axios.delete(`https://api.agora.io/${region}/v1/projects/${AGORA_APP_ID}/rtmp-converters/${converterId}`, {
+    const response = await axios.delete(`https://api.agora.io/${region}/v1/projects/${AGORA_APP_ID}/rtmp-converters/${stopId}`, {
       headers: { 'Authorization': getAuthHeader() }
     });
     res.json(response.data);
