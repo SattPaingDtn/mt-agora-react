@@ -32,15 +32,19 @@ import {
   RemoteUser,
 } from 'agora-rtc-react';
 import AgoraRTC from 'agora-rtc-sdk-ng';
-import AgoraRTM from 'agora-rtm-sdk';
 import VirtualBackgroundExtension from 'agora-extension-virtual-background';
-import RTMPStreamingModal from './components/RTMPStreamingModal';
 import styles from './PremiumMeetingRoom.module.css';
+
 
 // ─── Agora Extensions ───────────────────────────────────────
 const extension = new VirtualBackgroundExtension();
 AgoraRTC.registerExtensions([extension]);
-let processor = null;
+
+const BG_IMAGES = {
+  office: '/assets/bg_office.png',
+  cafe: '/assets/bg_cafe.png',
+  beach: '/assets/bg_beach.png',
+};
 
 // ─── Agora Credentials ──────────────────────────────────────
 // App ID will be fetched dynamically from the backend to ensure sync
@@ -152,44 +156,71 @@ export default function PremiumMeetingRoom({ channelName = 'MT_Test', displayNam
   // ── Toggle states ───────────────────────────────────────────
   const [micOn, setMicOn] = useState(true);
   const [cameraOn, setCameraOn] = useState(true);
-  const [screenShareOn, setScreenShareOn] = useState(false);  // UI only
-  const [virtualBgOn, setVirtualBgOn] = useState(false);  // UI only
-  const [captionsOn, setCaptionsOn] = useState(false);  // UI only
+  const [screenShareOn, setScreenShareOn] = useState(false); // UI only
 
-  // ── Recording States ────────────────────────────────────────
-  const localUid = useCurrentUID();
-  const [isRecording, setIsRecording] = useState(false);
-  const [recordingMode, setRecordingMode] = useState('mix');
-  const [recordingData, setRecordingData] = useState(null);
-  const [isRecordingLoading, setIsRecordingLoading] = useState(false);
+  // ── Virtual Background States ────────────────────────────────
+  const [bgType, setBgType] = useState('none'); // 'none', 'blur', 'color', 'image'
+  const [selectedColor, setSelectedColor] = useState('#1E1E24');
+  const [selectedImage, setSelectedImage] = useState('office');
+  const [showBgPanel, setShowBgPanel] = useState(false);
+
+  const preloadedImagesRef = useRef({});
+  const bgPanelRef = useRef(null);
+  const processorRef = useRef(null);
+
+  useEffect(() => {
+    // Preload background images
+    Object.entries(BG_IMAGES).forEach(([key, url]) => {
+      const img = new Image();
+      img.src = url;
+      preloadedImagesRef.current[key] = img;
+    });
+  }, []);
+
+  useEffect(() => {
+    function handleClickOutside(event) {
+      if (bgPanelRef.current && !bgPanelRef.current.contains(event.target)) {
+        setShowBgPanel(false);
+      }
+    }
+    if (showBgPanel) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [showBgPanel]);
+
+  // ── Meeting States ──────────────────────────────────────────
+  const [localUid] = useState(() => Math.floor(100000 + Math.random() * 900000));
   const client = useRTCClient();
-
-  // ── RTMP Streaming States ───────────────────────────────────
-  const [isStreaming, setIsStreaming] = useState(false);
-  const [isStreamingLoading, setIsStreamingLoading] = useState(false);
-  const [showRTMPModal, setShowRTMPModal] = useState(false);
-  const [converterId, setConverterId] = useState(null);
-  const [streamingUrl, setStreamingUrl] = useState('');
 
   // ── Virtual Background Init ─────────────────────────────────
   const [isProcessorReady, setIsProcessorReady] = useState(false);
 
   useEffect(() => {
     const initProcessor = async () => {
-      if (!processor && extension.checkCompatibility()) {
-        processor = extension.createProcessor();
+      if (!processorRef.current && extension.checkCompatibility()) {
+        const proc = extension.createProcessor();
         try {
-          await processor.init();
+          await proc.init();
+          processorRef.current = proc;
           setIsProcessorReady(true);
           console.log('[LUXE MEET] Virtual Background Processor initialized');
         } catch (error) {
           console.error('[LUXE MEET] Failed to initialize Virtual Background Processor', error);
         }
-      } else if (processor) {
+      } else if (processorRef.current) {
         setIsProcessorReady(true);
       }
     };
     initProcessor();
+
+    return () => {
+      if (processorRef.current) {
+        processorRef.current = null;
+      }
+    };
   }, []);
 
   // ── Call Timer ──────────────────────────────────────────────
@@ -203,24 +234,19 @@ export default function PremiumMeetingRoom({ channelName = 'MT_Test', displayNam
     return () => clearInterval(timerRef.current);
   }, []);
 
-  // ── Agora Hooks ─────────────────────────────────────────────
+  // ── Agora Hooks & Dynamic Token Setup ───────────────────────
   const [dynamicToken, setDynamicToken] = useState(null);
-  const [rtmToken, setRtmToken] = useState(null);
-  const [rtmUserId, setRtmUserId] = useState(null);
   const [isTokenReady, setIsTokenReady] = useState(false);
-  const [remoteNames, setRemoteNames] = useState({});
   const [dynamicAppId, setDynamicAppId] = useState('');
 
   useEffect(() => {
     let active = true;
     const fetchToken = async () => {
       try {
-        const res = await fetch(`/api/token?channelName=${channelName}&uid=0`);
+        const res = await fetch(`/api/token?channelName=${channelName}&uid=${localUid}`);
         const data = await res.json();
         if (data.token && active) {
           setDynamicToken(data.token);
-          setRtmToken(data.rtmToken);
-          setRtmUserId(data.rtmUserId);
           setDynamicAppId(data.appId);
           setIsTokenReady(true);
         }
@@ -228,88 +254,45 @@ export default function PremiumMeetingRoom({ channelName = 'MT_Test', displayNam
         console.error('Failed to fetch dynamic token', err);
       }
     };
-    if (channelName) fetchToken();
+    if (channelName && localUid) fetchToken();
     return () => { active = false; };
-  }, [channelName]);
+  }, [channelName, localUid]);
 
-  // ── Agora RTM Logic ─────────────────────────────────────────
-  const rtmRef = useRef(null);
 
-  useEffect(() => {
-    console.log("[RTM DEBUG] Effect triggered:", { isTokenReady, hasRtmToken: !!rtmToken, rtmUserId });
-    if (!isTokenReady || !rtmToken || !rtmUserId) return;
 
-    let active = true;
-    const initRTM = async () => {
-      try {
-        console.log("[RTM DEBUG] Attempting to create RTM instance...");
-        const rtm = new AgoraRTM.RTM(dynamicAppId, rtmUserId);
-        rtmRef.current = rtm;
-        console.log("[RTM] Initializing with UID:", rtmUserId);
 
-        // 1. Listen for messages
-        rtm.addEventListener("message", (event) => {
-          console.log("[RTM] Message received:", event);
-          try {
-            const data = JSON.parse(event.message);
-            if (data.type === "NAME_UPDATE") {
-              console.log("[RTM] Name update for:", data.rtcUid, "->", data.displayName);
-              setRemoteNames(prev => ({ ...prev, [data.rtcUid]: data.displayName }));
-            }
-          } catch (e) { console.error("[RTM] Parse error:", e); }
-        });
+  // ── Agora Join (with debug logging) ─────────────────────────
+  console.log('[AGORA DEBUG] useJoin config:', {
+    appid: dynamicAppId ? dynamicAppId.substring(0, 8) + '...' : '(empty)',
+    channel: channelName,
+    tokenLen: dynamicToken ? dynamicToken.length : 0,
+    uid: localUid,
+    isTokenReady,
+  });
 
-        // 2. Login
-        await rtm.login({ token: rtmToken });
-        console.log("[RTM] Logged in successfully");
-
-        // 3. Subscribe to channel
-        await rtm.subscribe(channelName);
-        console.log("[RTM] Subscribed to channel:", channelName);
-
-        // 4. Broadcast own name
-        const broadcast = () => {
-          if (active) {
-            console.log("[RTM] Broadcasting name:", displayName);
-            rtm.publish(channelName, JSON.stringify({
-              type: "NAME_UPDATE",
-              rtcUid: localUid,
-              displayName: displayName
-            }));
-          }
-        };
-
-        broadcast();
-        const interval = setInterval(broadcast, 5000); // Re-broadcast every 5s for late joiners
-
-        return () => {
-          clearInterval(interval);
-          rtm.logout();
-        };
-      } catch (err) {
-        console.error("RTM Error:", err);
-      }
-    };
-
-    const cleanupPromise = initRTM();
-    return () => {
-      active = false;
-      cleanupPromise.then(cleanup => cleanup && cleanup());
-    };
-  }, [isTokenReady, rtmToken, rtmUserId, channelName, localUid, displayName]);
-
-  useJoin({
+  const { data: joinUid, isLoading: isJoining, isConnected, error: joinError } = useJoin({
     appid: dynamicAppId || '',
     channel: channelName,
     token: dynamicToken,
+    uid: localUid,
   }, isTokenReady);
+
+  // Log join state changes
+  useEffect(() => {
+    console.log('[AGORA DEBUG] Join state changed:', { joinUid, isJoining, isConnected, joinError: joinError?.message });
+  }, [joinUid, isJoining, isConnected, joinError]);
 
   const { localMicrophoneTrack } = useLocalMicrophoneTrack(micOn);
   const { localCameraTrack } = useLocalCameraTrack(cameraOn);
-  usePublish([localMicrophoneTrack, localCameraTrack]);
+  usePublish([localMicrophoneTrack, localCameraTrack].filter(Boolean));
   const rtcClient = useRTCClient();
 
   const remoteUsers = useRemoteUsers();
+
+  // Log remote user changes
+  useEffect(() => {
+    console.log('[AGORA DEBUG] Remote users changed:', remoteUsers.map(u => ({ uid: u.uid, hasVideo: u.hasVideo, hasAudio: u.hasAudio })));
+  }, [remoteUsers]);
 
   // ── Derived Values ──────────────────────────────────────────
   const totalParticipants = 1 + remoteUsers.length;
@@ -339,27 +322,41 @@ export default function PremiumMeetingRoom({ channelName = 'MT_Test', displayNam
     console.log('[LUXE MEET] Screen Share toggled');
   }, []);
 
-  /**
-   * Toggle Virtual Background (Blur)
-   */
-  const handleToggleVirtualBg = useCallback(() => {
-    setVirtualBgOn((prev) => !prev);
-  }, []);
-
   // Apply Virtual Background
   useEffect(() => {
+    const processor = processorRef.current;
     if (!localCameraTrack || !processor || !isProcessorReady) return;
 
     const applyVirtualBg = async () => {
       try {
-        if (virtualBgOn) {
+        if (bgType === 'none') {
+          await processor.disable();
+          console.log('[LUXE MEET] Virtual Background disabled');
+        } else if (bgType === 'blur') {
           localCameraTrack.pipe(processor).pipe(localCameraTrack.processorDestination);
           processor.setOptions({ type: 'blur', blurDegree: 2 });
           await processor.enable();
-          console.log('[LUXE MEET] Virtual Background enabled');
-        } else {
-          await processor.disable();
-          console.log('[LUXE MEET] Virtual Background disabled');
+          console.log('[LUXE MEET] Virtual Background: Blur enabled');
+        } else if (bgType === 'color') {
+          localCameraTrack.pipe(processor).pipe(localCameraTrack.processorDestination);
+          processor.setOptions({ type: 'color', color: selectedColor });
+          await processor.enable();
+          console.log('[LUXE MEET] Virtual Background: Color enabled', selectedColor);
+        } else if (bgType === 'image') {
+          localCameraTrack.pipe(processor).pipe(localCameraTrack.processorDestination);
+          const cachedImg = preloadedImagesRef.current[selectedImage];
+          
+          const applyImg = () => {
+            processor.setOptions({ type: 'img', source: cachedImg });
+            processor.enable();
+            console.log('[LUXE MEET] Virtual Background: Image enabled', selectedImage);
+          };
+
+          if (cachedImg && cachedImg.complete) {
+            applyImg();
+          } else if (cachedImg) {
+            cachedImg.onload = applyImg;
+          }
         }
       } catch (e) {
         console.error('[LUXE MEET] Virtual Background Error:', e);
@@ -367,184 +364,13 @@ export default function PremiumMeetingRoom({ channelName = 'MT_Test', displayNam
     };
 
     applyVirtualBg();
-  }, [virtualBgOn, localCameraTrack, isProcessorReady]);
-
-  /**
-   * Send Floating Emoji (Reaction)
-   * TODO: Send reaction via Agora RTM channel message
-   */
-  const handleSendEmoji = useCallback(() => {
-    console.log('[LUXE MEET] Emoji reaction sent');
-  }, []);
-
-  /**
-   * Toggle Auto-Captions (STT)
-   * TODO: Implement with Agora Real-Time STT
-   */
-  const handleToggleCaptions = useCallback(() => {
-    setCaptionsOn((prev) => !prev);
-    console.log('[LUXE MEET] Captions toggled');
-  }, []);
-
-  /**
-   * Toggle Cloud Recording
-   */
-  const handleToggleRecording = useCallback(async () => {
-    if (isRecordingLoading) return;
-    setIsRecordingLoading(true);
-
-    try {
-      if (!isRecording) {
-        // The Cloud Recording Bot MUST have its own unique UID to join the channel.
-        // It cannot use localUid, otherwise it kicks the host out!
-        const uidToUse = Math.floor(Math.random() * 999999) + 1;
-
-        const acquireRes = await fetch('/api/recording/acquire', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ channelName, uid: uidToUse, mode: recordingMode })
-        });
-        const acquireData = await acquireRes.json();
-
-        if (!acquireRes.ok) throw new Error(acquireData.error || 'Failed to acquire');
-        const resourceId = acquireData.resourceId;
-
-        const startRes = await fetch('/api/recording/start', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            resourceId,
-            mode: recordingMode,
-            channelName,
-            uid: uidToUse,
-            token: dynamicToken,
-            url: recordingMode === 'web' ? window.location.origin : undefined
-          })
-        });
-        const startData = await startRes.json();
-
-        if (!startRes.ok || (startData?.code !== undefined && startData?.code !== 0) || !startData?.sid) {
-          const errorMsg = startData?.reason || startData?.error || 'Failed to start';
-          throw new Error(errorMsg);
-        }
-
-        setRecordingData({ resourceId, sid: startData.sid, uidUsed: uidToUse });
-        setIsRecording(true);
-        console.log(`[LUXE MEET] Started ${recordingMode} recording`);
-      } else {
-        // Stop Recording Flow
-        if (!recordingData) throw new Error("No recording data to stop");
-
-        const stopRes = await fetch('/api/recording/stop', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            resourceId: recordingData.resourceId,
-            sid: recordingData.sid,
-            mode: recordingMode,
-            channelName,
-            uid: recordingData.uidUsed
-          })
-        });
-
-        const stopData = await stopRes.json();
-        if (!stopRes.ok) throw new Error(stopData.error || 'Failed to stop');
-
-        setRecordingData(null);
-        setIsRecording(false);
-        console.log(`[LUXE MEET] Stopped ${recordingMode} recording`);
-      }
-    } catch (err) {
-      console.error("[LUXE MEET] Recording error:", err);
-      alert("Recording Error: " + (err.message || JSON.stringify(err)));
-    } finally {
-      setIsRecordingLoading(false);
-    }
-  }, [isRecording, isRecordingLoading, recordingMode, channelName, localUid, recordingData]);
-
-  /**
-   * RTMP Streaming Handlers (Backend-Driven)
-   */
-  const handleStartRTMP = useCallback(async ({ rtmpUrl, width, height, bitrate }) => {
-    if (isStreamingLoading) return;
-    setIsStreamingLoading(true);
-
-    try {
-      // Use a random UID for the converter bot
-      const converterUid = Math.floor(Math.random() * 1000000);
-
-      const res = await fetch('/api/rtmp/start', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          channelName,
-          rtmpUrl,
-          width,
-          height,
-          bitrate,
-          uid: converterUid,
-          localUid: localUid,
-          remoteUids: remoteUsers.map(u => u.uid)
-        })
-      });
-
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.reason || data.error || 'Failed to start RTMP stream');
-
-      const parsedConverterId = data.converterId || data.id || data.converter?.id;
-      if (!parsedConverterId) throw new Error('Missing RTMP converter ID in start response');
-
-      setConverterId(parsedConverterId);
-      setStreamingUrl(rtmpUrl);
-      setIsStreaming(true);
-      setShowRTMPModal(false);
-      console.log('[LUXE MEET] RTMP Streaming started:', parsedConverterId);
-    } catch (err) {
-      console.error("[LUXE MEET] RTMP Error:", err);
-      alert("RTMP Error: " + err.message);
-    } finally {
-      setIsStreamingLoading(false);
-    }
-  }, [channelName, localUid, remoteUsers, isStreamingLoading]);
-
-  const handleStopRTMP = useCallback(async () => {
-    if (isStreamingLoading || !converterId) return;
-    setIsStreamingLoading(true);
-
-    try {
-      const res = await fetch('/api/rtmp/stop', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ converterId })
-      });
-
-      if (!res.ok) {
-        const data = await res.json();
-        throw new Error(data.reason || data.error || 'Failed to stop RTMP stream');
-      }
-
-      setConverterId(null);
-      setStreamingUrl('');
-      setIsStreaming(false);
-      console.log('[LUXE MEET] RTMP Streaming stopped');
-    } catch (err) {
-      console.error("[LUXE MEET] RTMP Stop Error:", err);
-      alert("RTMP Stop Error: " + err.message);
-    } finally {
-      setIsStreamingLoading(false);
-    }
-  }, [converterId, isStreamingLoading]);
+  }, [bgType, selectedColor, selectedImage, localCameraTrack, isProcessorReady]);
 
   /** End the call and notify parent */
   const handleEndCall = useCallback(async () => {
     console.log('[LUXE MEET] Ending call and cleaning up...');
 
-    // 1. Stop RTMP Stream if active
-    if (isStreaming) {
-      await handleStopRTMP();
-    }
-
-    // 2. Leave Agora explicitly before releasing local tracks
+    // 1. Leave Agora explicitly before releasing local tracks
     if (rtcClient) {
       try {
         await rtcClient.leave();
@@ -554,7 +380,7 @@ export default function PremiumMeetingRoom({ channelName = 'MT_Test', displayNam
       }
     }
 
-    // 3. Stop local media tracks and clear local device usage
+    // 2. Stop local media tracks and clear local device usage
     if (localCameraTrack) {
       try {
         localCameraTrack.stop();
@@ -575,22 +401,16 @@ export default function PremiumMeetingRoom({ channelName = 'MT_Test', displayNam
     setCameraOn(false);
     setMicOn(false);
 
-    // 4. Clear timers
+    // 3. Clear timers
     clearInterval(timerRef.current);
 
-    // 5. Notify parent to exit meeting UI
+    // 4. Notify parent to exit meeting UI
     if (onLeave) onLeave();
-  }, [onLeave, localCameraTrack, localMicrophoneTrack, handleStopRTMP, isStreaming, rtcClient]);
+  }, [onLeave, localCameraTrack, localMicrophoneTrack, rtcClient]);
 
   // Comprehensive Cleanup (Tab close / Unmount)
   useEffect(() => {
     const cleanup = async () => {
-      if (isStreaming && converterId) {
-        // Use navigator.sendBeacon for more reliable cleanup on tab close
-        const payload = new Blob([JSON.stringify({ converterId })], { type: 'application/json' });
-        navigator.sendBeacon('/api/rtmp/stop', payload);
-      }
-
       if (rtcClient) {
         try {
           await rtcClient.leave();
@@ -624,7 +444,8 @@ export default function PremiumMeetingRoom({ channelName = 'MT_Test', displayNam
       window.removeEventListener('beforeunload', cleanup);
       cleanup();
     };
-  }, [isStreaming, converterId, rtcClient, localCameraTrack, localMicrophoneTrack]);
+  }, [rtcClient, localCameraTrack, localMicrophoneTrack]);
+
 
   // ── Render ──────────────────────────────────────────────────
   return (
@@ -635,13 +456,6 @@ export default function PremiumMeetingRoom({ channelName = 'MT_Test', displayNam
           <span className={styles.brandName}>LUXE MEET</span>
           <span className={styles.channelDot} />
           <span className={styles.channelName}>{channelName}</span>
-
-          {isStreaming && (
-            <div className={styles.liveBadge}>
-              <span className={styles.liveDot} />
-              LIVE
-            </div>
-          )}
         </div>
 
         <div className={styles.headerRight}>
@@ -702,7 +516,7 @@ export default function PremiumMeetingRoom({ channelName = 'MT_Test', displayNam
               />
               <div className={styles.nameTag}>
                 <span className={styles.nameTagText}>
-                  {remoteNames[user.uid] || `User ${user.uid}`}
+                  User {user.uid}
                 </span>
               </div>
             </div>
@@ -749,81 +563,106 @@ export default function PremiumMeetingRoom({ channelName = 'MT_Test', displayNam
           <span className={styles.controlBtnTooltip}>Screen Share</span>
         </button>
 
-        {/* Virtual Background (Blur) */}
-        <button
-          className={`${styles.controlBtn} ${virtualBgOn ? styles.controlBtnActive : ''}`}
-          onClick={handleToggleVirtualBg}
-          aria-label="Toggle virtual background"
-        >
-          <Icon.Sparkles />
-          <span className={styles.controlBtnTooltip}>Blur BG</span>
-        </button>
-
-        {/* Send Emoji Reaction */}
-        <button
-          className={styles.controlBtn}
-          onClick={handleSendEmoji}
-          aria-label="Send emoji reaction"
-        >
-          <Icon.Smile />
-          <span className={styles.controlBtnTooltip}>React</span>
-        </button>
-
-        {/* Auto-Captions (STT) */}
-        <button
-          className={`${styles.controlBtn} ${captionsOn ? styles.controlBtnActive : ''}`}
-          onClick={handleToggleCaptions}
-          aria-label="Toggle captions"
-        >
-          <Icon.Captions />
-          <span className={styles.controlBtnTooltip}>Captions</span>
-        </button>
-
-        <div className={styles.controlDivider} />
-
-        {/* Cloud Recording */}
-        <div className={styles.recordingGroup}>
-          <span className={styles.recordingLabel}>Recording</span>
-          <select
-            value={recordingMode}
-            onChange={(e) => setRecordingMode(e.target.value)}
-            disabled={isRecording || isRecordingLoading}
-            className={styles.recordingSelect}
-          >
-            <option value="mix">Mix</option>
-            <option value="individual">Individual</option>
-            <option value="web">Web</option>
-          </select>
-
+        {/* Virtual Background (Sparkles) with Popover */}
+        <div className={styles.controlBtnWrapper} ref={bgPanelRef}>
           <button
-            className={`${styles.controlBtn} ${isRecording ? styles.controlBtnActive : ''} ${isRecordingLoading ? styles.controlBtnMuted : ''}`}
-            onClick={handleToggleRecording}
-            aria-label="Toggle recording"
-            disabled={isRecordingLoading}
-            style={isRecording ? { color: '#ff4444' } : {}}
+            className={`${styles.controlBtn} ${bgType !== 'none' ? styles.controlBtnActive : ''}`}
+            onClick={() => setShowBgPanel((prev) => !prev)}
+            aria-label="Toggle virtual background options"
           >
-            <Icon.Record />
-            <span className={styles.controlBtnTooltip}>
-              {isRecordingLoading ? 'Processing...' : (isRecording ? 'Stop Rec' : 'Start Rec')}
-            </span>
+            <Icon.Sparkles />
+            <span className={styles.controlBtnTooltip}>バーチャル背景</span>
           </button>
+
+          {showBgPanel && (
+            <div className={styles.bgPanel}>
+              <div className={styles.bgPanelHeader}>
+                <span className={styles.bgPanelTitle}>バーチャル背景</span>
+                <button
+                  className={styles.bgPanelClose}
+                  onClick={() => setShowBgPanel(false)}
+                  aria-label="Close background panel"
+                >
+                  &times;
+                </button>
+              </div>
+
+              <div className={styles.bgPanelContent}>
+                {/* 1. Basic Settings */}
+                <div className={styles.bgSection}>
+                  <div className={styles.bgSectionHeader}>基本設定</div>
+                  <div className={styles.bgBasicGrid}>
+                    <button
+                      className={`${styles.bgOptionCard} ${bgType === 'none' ? styles.bgOptionCardActive : ''}`}
+                      onClick={() => setBgType('none')}
+                    >
+                      <div className={styles.bgIconNone}>🚫</div>
+                      <span className={styles.bgOptionLabel}>なし</span>
+                    </button>
+                    <button
+                      className={`${styles.bgOptionCard} ${bgType === 'blur' ? styles.bgOptionCardActive : ''}`}
+                      onClick={() => setBgType('blur')}
+                    >
+                      <div className={styles.bgIconBlur}>✨</div>
+                      <span className={styles.bgOptionLabel}>ぼかし</span>
+                    </button>
+                  </div>
+                </div>
+
+                {/* 2. Curated Colors */}
+                <div className={styles.bgSection}>
+                  <div className={styles.bgSectionHeader}>単色背景</div>
+                  <div className={styles.colorsGrid}>
+                    {[
+                      { name: 'ダークグレー', val: '#1E1E24' },
+                      { name: 'ネイビー', val: '#0D1B2A' },
+                      { name: 'エメラルド', val: '#0B2521' },
+                      { name: 'チャコール', val: '#1C1917' },
+                      { name: 'ブロンズ', val: '#2A1F1B' }
+                    ].map((c) => (
+                      <button
+                        key={c.val}
+                        className={`${styles.colorCircle} ${bgType === 'color' && selectedColor === c.val ? styles.colorCircleActive : ''}`}
+                        style={{ backgroundColor: c.val }}
+                        onClick={() => {
+                          setBgType('color');
+                          setSelectedColor(c.val);
+                        }}
+                        title={c.name}
+                        aria-label={`Apply ${c.name} background`}
+                      />
+                    ))}
+                  </div>
+                </div>
+
+                {/* 3. Virtual Background Images */}
+                <div className={styles.bgSection}>
+                  <div className={styles.bgSectionHeader}>画像背景</div>
+                  <div className={styles.imagesGrid}>
+                    {[
+                      { key: 'office', name: 'オフィス', src: '/assets/bg_office.png' },
+                      { key: 'cafe', name: 'カフェ', src: '/assets/bg_cafe.png' },
+                      { key: 'beach', name: 'ビーチ', src: '/assets/bg_beach.png' }
+                    ].map((img) => (
+                      <button
+                        key={img.key}
+                        className={`${styles.imageCard} ${bgType === 'image' && selectedImage === img.key ? styles.imageCardActive : ''}`}
+                        onClick={() => {
+                          setBgType('image');
+                          setSelectedImage(img.key);
+                        }}
+                        aria-label={`Apply ${img.name} background`}
+                      >
+                        <img src={img.src} alt={img.name} className={styles.imageThumb} />
+                        <span className={img.key === 'beach' ? styles.imageCardLabelDark : styles.imageCardLabel}>{img.name}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
-
-        <div className={styles.controlDivider} />
-
-        {/* RTMP Media Push */}
-        <button
-          className={`${styles.controlBtn} ${isStreaming ? styles.controlBtnActive : ''} ${isStreamingLoading ? styles.controlBtnMuted : ''}`}
-          onClick={isStreaming ? handleStopRTMP : () => setShowRTMPModal(true)}
-          aria-label="Toggle RTMP streaming"
-          disabled={isStreamingLoading}
-          style={isStreaming ? { color: '#D4AF37', borderColor: '#D4AF37' } : {}}
-        >
-          <Icon.Broadcast />
-          <span className={styles.controlBtnTooltip}>
-            {isStreamingLoading ? 'Processing...' : (isStreaming ? 'Stop Live' : 'Go Live')}
-          </span>
-        </button>
 
         <div className={styles.controlDivider} />
 
@@ -837,15 +676,6 @@ export default function PremiumMeetingRoom({ channelName = 'MT_Test', displayNam
           <span className={styles.controlBtnTooltip}>End Call</span>
         </button>
       </footer>
-
-      {/* ─── Modals ─── */}
-      <RTMPStreamingModal
-        isOpen={showRTMPModal}
-        onClose={() => setShowRTMPModal(false)}
-        onStart={handleStartRTMP}
-        isLoading={isStreamingLoading}
-        isReady={!!localUid && localUid !== 0}
-      />
     </div>
   );
 }

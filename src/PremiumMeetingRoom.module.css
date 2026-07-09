@@ -725,3 +725,225 @@
   transform: none;
   box-shadow: none;
 }
+
+/* ---------- Virtual Background Popover ---------- */
+.controlBtnWrapper {
+  position: relative;
+}
+
+.bgPanel {
+  position: absolute;
+  bottom: 64px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 320px;
+  background: linear-gradient(180deg, rgba(20, 20, 20, 0.98) 0%, rgba(10, 10, 10, 0.96) 100%);
+  border: 1px solid rgba(212, 175, 55, 0.25);
+  border-radius: 16px;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.6), 0 0 20px rgba(212, 175, 55, 0.05);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  padding: 16px;
+  z-index: 100;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  animation: bgPanelIn 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes bgPanelIn {
+  from {
+    opacity: 0;
+    transform: translateX(-50%) translateY(10px) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0) scale(1);
+  }
+}
+
+.bgPanelHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  padding-bottom: 8px;
+}
+
+.bgPanelTitle {
+  font-family: 'Outfit', 'Inter', sans-serif;
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  background: linear-gradient(135deg, #D4AF37 0%, #F5D76E 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.bgPanelClose {
+  background: none;
+  border: none;
+  color: rgba(255, 255, 255, 0.6);
+  font-size: 20px;
+  cursor: pointer;
+  line-height: 1;
+  padding: 0;
+  transition: color 0.2s;
+}
+
+.bgPanelClose:hover {
+  color: #FFFFFF;
+}
+
+.bgPanelContent {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.bgSection {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.bgSectionHeader {
+  font-size: 11px;
+  font-weight: 700;
+  color: #A0A0A0;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  text-align: left;
+}
+
+/* Basic items grid (None, Blur) */
+.bgBasicGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.bgOptionCard {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  padding: 8px 12px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.bgOptionCard:hover {
+  background: rgba(212, 175, 55, 0.08);
+  border-color: rgba(212, 175, 55, 0.3);
+}
+
+.bgOptionCardActive {
+  background: rgba(212, 175, 55, 0.12) !important;
+  border-color: #D4AF37 !important;
+  box-shadow: 0 0 10px rgba(212, 175, 55, 0.1);
+}
+
+.bgIconNone,
+.bgIconBlur {
+  font-size: 14px;
+}
+
+.bgOptionLabel {
+  font-size: 12px;
+  color: #FFFFFF;
+  font-weight: 500;
+}
+
+/* Curated solid colors */
+.colorsGrid {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  padding: 4px 0;
+}
+
+.colorCircle {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 1.5px solid rgba(255, 255, 255, 0.15);
+  cursor: pointer;
+  transition: all 0.2s;
+  box-sizing: border-box;
+  padding: 0;
+}
+
+.colorCircle:hover {
+  transform: scale(1.15);
+  border-color: #FFFFFF;
+}
+
+.colorCircleActive {
+  border-color: #D4AF37 !important;
+  box-shadow: 0 0 8px rgba(212, 175, 55, 0.5);
+  transform: scale(1.1);
+}
+
+/* Image background thumbnails */
+.imagesGrid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+
+.imageCard {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  border: 1.5px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  overflow: hidden;
+  cursor: pointer;
+  transition: all 0.2s;
+  background: rgba(0, 0, 0, 0.3);
+  padding: 0;
+  text-align: center;
+}
+
+.imageCard:hover {
+  border-color: rgba(212, 175, 55, 0.4);
+}
+
+.imageCardActive {
+  border-color: #D4AF37 !important;
+  box-shadow: 0 0 8px rgba(212, 175, 55, 0.3);
+}
+
+.imageThumb {
+  width: 100%;
+  aspect-ratio: 16 / 10;
+  object-fit: cover;
+}
+
+.imageCardLabel {
+  font-size: 9px;
+  font-weight: 600;
+  color: #A0A0A0;
+  padding: 4px 2px;
+  background: rgba(10, 10, 10, 0.7);
+  transition: color 0.2s;
+}
+
+.imageCardLabelDark {
+  font-size: 9px;
+  font-weight: 600;
+  color: #fff;
+  padding: 4px 2px;
+  background: rgba(10, 10, 10, 0.7);
+  transition: color 0.2s;
+}
+
+.imageCard:hover .imageCardLabel,
+.imageCardActive .imageCardLabel {
+  color: #D4AF37;
+}

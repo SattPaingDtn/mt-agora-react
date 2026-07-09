@@ -4,15 +4,15 @@
  */
 
 import { useState } from 'react';
-import AgoraRTC, { AgoraRTCProvider, useRTCClient } from 'agora-rtc-react';
+import AgoraRTC, { AgoraRTCProvider } from 'agora-rtc-react';
 import LuxeLanding from './LuxeLanding';
 import PremiumMeetingRoom from './PremiumMeetingRoom';
 import RecordingGallery from './components/RecordingGallery';
 
+// Create client ONCE outside the component to prevent re-creation on re-renders
+const agoraClient = AgoraRTC.createClient({ codec: 'h264', mode: 'rtc' });
+
 function App() {
-  const client = useRTCClient(
-    AgoraRTC.createClient({ codec: 'h264', mode: 'rtc' })
-  );
   const [inCall, setInCall] = useState(false);
   const [showGallery, setShowGallery] = useState(false);
   const [channelName, setChannelName] = useState('');
@@ -39,7 +39,7 @@ function App() {
   }
 
   return (
-    <AgoraRTCProvider client={client}>
+    <AgoraRTCProvider client={agoraClient}>
       <PremiumMeetingRoom channelName={channelName} displayName={displayName} onLeave={handleLeave} />
     </AgoraRTCProvider>
   );
